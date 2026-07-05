@@ -167,3 +167,4 @@ gradle-app.setting
 /.idea/
 /lib/
 /implement-md.md
+/http-client.private.env.json

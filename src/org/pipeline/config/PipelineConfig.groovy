@@ -4,7 +4,6 @@ class PipelineConfig implements Serializable {
 
     static final Map DEFAULTS = [
         name   : 'jenkins-pipeline',
-        agent  : 'any',
         options: [
             timeout                : 60,
             disableConcurrentBuilds: true,

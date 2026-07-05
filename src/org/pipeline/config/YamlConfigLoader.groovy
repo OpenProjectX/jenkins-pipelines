@@ -28,7 +28,7 @@ class YamlConfigLoader implements Serializable {
             merged = deepMerge(merged, params.overrides as Map)
         }
 
-        steps.echo("[Config] Pipeline: ${merged.name}, Agent: ${merged.agent}")
+        steps.echo("[Config] Pipeline: ${merged.name}")
         return merged
     }
 

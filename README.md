@@ -17,7 +17,6 @@ ciPipeline()
 
 ```yaml
 name: my-service
-agent: linux
 
 stages:
   build:
@@ -46,11 +45,13 @@ stages:
 
 ```groovy
 ciPipeline(
+    agent: 'gradle-long-running',         // node label; without it, runs on any available node
     workflowFile: 'custom.yaml',          // file under .jenkins/workflows/ (default: ci.yaml)
-    agent: 'linux-large',                 // node label (default: 'any')
     overrides: [stages: [deploy: [enabled: false]]]  // deep-merged over the loaded config
 )
 ```
+
+The agent label can **only** be set here, not in the workflow YAML — the YAML lives in the repo, so it can only be read after a node is allocated and the workspace checked out. On a Kubernetes-cloud Jenkins the label must match a pod template label, or the build will queue forever.
 
 ## Pipeline stages
 
@@ -85,7 +86,6 @@ Configuration is resolved in three layers, later layers winning via deep merge:
 
 ```yaml
 name: my-service          # display name (default: jenkins-pipeline)
-agent: linux              # node label (default: any)
 options:
   timeout: 60             # whole-pipeline timeout, minutes
   abortPreviousBuilds: false  # cancel older builds of the same branch/PR

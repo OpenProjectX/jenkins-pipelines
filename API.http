@@ -1,0 +1,20 @@
+GET https://jenkins.cn-guangzhou-a.k8s.openprojectx.org/api/json?pretty=true
+Authorization: Basic admin {{password}}
+
+### job
+GET https://jenkins.cn-guangzhou-a.k8s.openprojectx.org/job/spark-lakehouse/job/master/2/api/json
+Authorization: Basic admin {{password}}
+
+
+###
+//@no-redirect
+GET https://jenkins.cn-guangzhou-a.k8s.openprojectx.org/job/spark-lakehouse/job/master/lastBuild/api/json
+Authorization: Basic admin {{password}}
+
+
+### job log
+GET https://jenkins.cn-guangzhou-a.k8s.openprojectx.org/job/spark-lakehouse/job/master/3/consoleText
+Authorization: Basic admin {{password}}
+
+
+###

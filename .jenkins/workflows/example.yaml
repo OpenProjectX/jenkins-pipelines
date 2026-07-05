@@ -4,7 +4,8 @@
 # Only override what you need.
 
 name: "my-service"
-agent: linux
+# Note: the agent label cannot be set here — the YAML is only read after node
+# allocation. Pass it in your Jenkinsfile: ciPipeline(agent: 'my-label')
 
 options:
   timeout: 45                    # minutes; default: 60

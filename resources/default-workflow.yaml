@@ -1,7 +1,9 @@
 # Default pipeline configuration — merged with user's .jenkins/workflows/ci.yaml
 # Values here are overridden by the consuming repo's ci.yaml
 name: jenkins-pipeline
-agent: any
+# Note: the agent label is NOT configurable here — pass it to the pipeline
+# entry point instead: ciPipeline(agent: 'my-label'). The YAML is only read
+# after node allocation, so it cannot influence which node is used.
 
 options:
   timeout: 60
