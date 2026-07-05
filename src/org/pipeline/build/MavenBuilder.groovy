@@ -20,7 +20,7 @@ class MavenBuilder implements BuildTool, Serializable {
         Toolchain.withJdk(steps, config, mc.jdkVersion as String) {
             steps.withEnv(["MAVEN_OPTS=${opts}"]) {
                 withMavenSettings(mc.settingsId) {
-                    steps.sh(label: 'Maven Build', script: "mvn ${goals} ${profiles} ${settings}".trim())
+                    steps.sh(label: 'Maven Build', script: "${mavenCommand()} ${goals} ${profiles} ${settings}".trim())
                 }
             }
         }
@@ -36,10 +36,14 @@ class MavenBuilder implements BuildTool, Serializable {
         Toolchain.withJdk(steps, config, mc.jdkVersion as String) {
             steps.withEnv(["MAVEN_OPTS=${opts}"]) {
                 withMavenSettings(mc.settingsId) {
-                    steps.sh(label: 'Maven Test', script: "mvn ${goals}")
+                    steps.sh(label: 'Maven Test', script: "${mavenCommand()} ${goals}")
                 }
             }
         }
+    }
+
+    private String mavenCommand() {
+        steps.fileExists('mvnw') ? './mvnw' : 'mvn'
     }
 
     private void withMavenSettings(String settingsId, Closure body) {

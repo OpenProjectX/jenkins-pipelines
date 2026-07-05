@@ -39,6 +39,15 @@ class NodejsBuilder implements BuildTool, Serializable {
             steps.container(Toolchain.containerName(config)) {
                 body()
             }
+        } else if (Toolchain.isKubernetesAgent(steps) && version) {
+            def nodeHome = steps.env["NODE${version.tokenize('.')[0]}_HOME"]
+            if (nodeHome) {
+                steps.withEnv(["PATH+NODE=${nodeHome}/bin"]) {
+                    body()
+                }
+            } else {
+                body()
+            }
         } else if (version) {
             steps.nodejs(nodeJSInstallationName: "NodeJS-${version}") {
                 body()

@@ -36,7 +36,7 @@ class SonarScanner implements Serializable {
                         break
                     case 'maven':
                         steps.sh(label: 'SonarQube Analysis', script: """
-                            mvn sonar:sonar -Dsonar.projectKey=${projectKey} ${extraProps}
+                            ${mavenCommand()} sonar:sonar -Dsonar.projectKey=${projectKey} ${extraProps}
                         """.stripIndent().trim())
                         break
                     default:
@@ -55,5 +55,9 @@ class SonarScanner implements Serializable {
                 }
             }
         }
+    }
+
+    private String mavenCommand() {
+        steps.fileExists('mvnw') ? './mvnw' : 'mvn'
     }
 }

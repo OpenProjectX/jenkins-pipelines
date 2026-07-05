@@ -9,7 +9,7 @@
  * With an agent label, custom workflow file, or runtime overrides:
  *
  *   ciPipeline(
- *     agent: 'gradle-long-running',
+ *     agent: 'gradle-long-running', // pod template label, e.g. all-in-one jnlp build agent
  *     workflowFile: 'custom.yaml',
  *     overrides: [options: [timeout: 30]]
  *   )

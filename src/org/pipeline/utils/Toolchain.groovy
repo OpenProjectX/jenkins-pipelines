@@ -5,7 +5,8 @@ package org.pipeline.utils
  *
  * On a Kubernetes pod agent (detected via KUBERNETES_SERVICE_HOST, which is
  * injected into every pod) with stages.build.container configured, the body
- * runs inside that pod container — the container image provides the JDK/tools.
+ * runs inside that pod container. Without a sidecar container, the body stays
+ * in the inbound agent container and uses JAVA<version>_HOME when available.
  *
  * On a classic (static/VM) agent, it falls back to the Jenkins tool
  * installation "jdk-<version>" when a jdkVersion is configured.
@@ -13,14 +14,17 @@ package org.pipeline.utils
  * This lets the same workflow YAML run on both agent types:
  *
  *   build:
- *     container: jdk17      # used on Kubernetes pod agents
  *     gradle:
- *       jdkVersion: "17"    # used on classic agents (Jenkins JDK tool "jdk-17")
+ *       jdkVersion: "17"    # k8s: JAVA17_HOME; classic: Jenkins tool "jdk-17"
  */
 class Toolchain implements Serializable {
 
+    static boolean isKubernetesAgent(def steps) {
+        steps.env.KUBERNETES_SERVICE_HOST
+    }
+
     static boolean useContainer(def steps, Map config) {
-        containerName(config) && steps.env.KUBERNETES_SERVICE_HOST
+        containerName(config) && isKubernetesAgent(steps)
     }
 
     static String containerName(Map config) {
@@ -32,6 +36,15 @@ class Toolchain implements Serializable {
             steps.container(containerName(config)) {
                 body()
             }
+        } else if (isKubernetesAgent(steps) && jdkVersion) {
+            def javaHome = steps.env["JAVA${majorVersion(jdkVersion)}_HOME"]
+            if (javaHome) {
+                steps.withEnv(["JAVA_HOME=${javaHome}", "PATH+JDK=${javaHome}/bin"]) {
+                    body()
+                }
+            } else {
+                body()
+            }
         } else if (jdkVersion) {
             def jdkHome = steps.tool(name: "jdk-${jdkVersion}", type: 'jdk')
             steps.withEnv(["JAVA_HOME=${jdkHome}", "PATH+JDK=${jdkHome}/bin"]) {
@@ -40,5 +53,9 @@ class Toolchain implements Serializable {
         } else {
             body()
         }
+    }
+
+    private static String majorVersion(String version) {
+        version.tokenize('.')[0]
     }
 }

@@ -24,6 +24,9 @@ stages:
   build:
     enabled: true
     tool: gradle
+    # Omit container when the Kubernetes pod template uses the all-in-one
+    # ghcr.io/openprojectx/jenkins-build-agent image as its jnlp container.
+    # Set container only for legacy sidecar pod templates, e.g. container: jdk17.
     gradle:
       tasks: "clean build -x test"
       jdkVersion: "17"

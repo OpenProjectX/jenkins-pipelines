@@ -45,7 +45,7 @@ stages:
 
 ```groovy
 ciPipeline(
-    agent: 'gradle-long-running',         // node label; without it, runs on any available node
+    agent: 'gradle-long-running',         // pod-template/node label; without it, runs on any available node
     workflowFile: 'custom.yaml',          // file under .jenkins/workflows/ (default: ci.yaml)
     overrides: [stages: [deploy: [enabled: false]]]  // deep-merged over the loaded config
 )
@@ -100,22 +100,22 @@ Set `stages.build.tool` and configure the matching block:
 ```yaml
 build:
   tool: gradle            # gradle | maven | nodejs
-  container: jdk17        # k8s pod agents only: run build/test/scan in this pod container
+  # container: jdk17      # legacy k8s sidecar only; omit for the all-in-one jnlp agent
   gradle:
     tasks: "clean build -x test"
-    jdkVersion: "17"      # classic agents only: Jenkins JDK tool named "jdk-<version>"
+    jdkVersion: "17"      # k8s all-in-one: JAVA17_HOME; classic: Jenkins JDK tool "jdk-17"
     gradleOpts: "-Xmx2g"
     proxy:                # optional override; auto-detected from agent env by default
       host: 192.168.0.89
       port: 10809
       noProxy: "localhost,127.0.0.1,.svc.cluster.local"
   maven:
-    goals: "clean package -DskipTests"
+    goals: "clean package -DskipTests"  # runs ./mvnw when present, otherwise mvn
     mavenOpts: "-Xmx2g"
     profiles: ["ci"]
     settingsId: my-settings   # Config File Provider file id
   nodejs:
-    nodeVersion: "20"     # uses the NodeJS installation named "NodeJS-<version>"
+    nodeVersion: "22"     # k8s all-in-one: NODE22_HOME; classic: NodeJS installation "NodeJS-22"
     packageManager: npm   # npm | yarn
     buildScript: build
   archiveArtifacts: "**/build/libs/*.jar"
@@ -127,7 +127,7 @@ Unit-test commands are configured separately under `stages.unit-test.<tool>` (`g
 
 Note that `gradle.gradleOpts` is likewise passed via `GRADLE_OPTS` (JVM options like `-Xmx2g` are not valid Gradle CLI arguments).
 
-**Kubernetes vs classic agents.** The library supports both with one config. On a Kubernetes pod agent (detected via `KUBERNETES_SERVICE_HOST`), setting `build.container` runs build, unit-test, and Sonar steps inside that pod container — the container image supplies the JDK/Node, so no Jenkins tool installation is needed. On a classic agent, `container` is ignored and the library falls back to Jenkins tool installations: `jdkVersion: "17"` → JDK tool `jdk-17`, `nodeVersion: "20"` → NodeJS installation `NodeJS-20`. Set both fields to make the same workflow file portable across agent types.
+**Kubernetes vs classic agents.** The preferred Kubernetes setup is an all-in-one inbound agent image on the pod template's `jnlp` container, for example `ghcr.io/openprojectx/jenkins-build-agent:latest`. With that setup, omit `build.container`; build, unit-test, and Sonar steps run in the agent container, `jdkVersion: "17"` selects `JAVA17_HOME` when the image provides it, and `nodeVersion: "22"` selects `NODE22_HOME`. `build.container` is still supported for older pod templates that use per-tool sidecars such as `jdk17`. On a classic agent, `container` is ignored and the library falls back to Jenkins tool installations: `jdkVersion: "17"` → JDK tool `jdk-17`, `nodeVersion: "22"` → NodeJS installation `NodeJS-22`.
 
 ### Scanning
 
@@ -240,6 +240,6 @@ All classes take the pipeline `steps` object in their constructor and must imple
 Controller/agent tooling assumed by the stages you enable:
 
 - **Plugins**: Pipeline Utility Steps (`readYaml`), AnsiColor, JUnit, Workspace Cleanup; SonarQube Scanner (`withSonarQubeEnv`), GitHub Notify (`githubNotify`), Bitbucket Build Status Notifier (`bitbucketStatusNotify`), Config File Provider (Maven `settingsId`), NodeJS plugin — each only if the matching feature is used.
-- **Agent tools**: `git` (plus `git-lfs` if enabled), the selected build tool (`./gradlew` wrapper, `mvn`, or node/npm/yarn), `trivy`, `helm`, `kubectl` as applicable.
+- **Agent tools**: `git` (plus `git-lfs` if enabled), the selected build tool (`./gradlew` wrapper, `./mvnw` or `mvn`, node/npm/yarn), `trivy`, `helm`, `kubectl` as applicable. For Kubernetes pod agents, the recommended `jnlp` image is `ghcr.io/openprojectx/jenkins-build-agent:latest`.
 - **Tool installations**: JDKs named `jdk-<version>` and NodeJS installations named `NodeJS-<version>` when `jdkVersion`/`nodeVersion` are set.
 - **Credentials**: kubeconfig file credentials for deploy; GitHub/Bitbucket tokens for the PR gate.
