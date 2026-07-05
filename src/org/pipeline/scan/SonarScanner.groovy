@@ -25,10 +25,14 @@ class SonarScanner implements Serializable {
             Toolchain.withJdk(steps, config, jdkVersion as String) {
                 switch (buildTool) {
                     case 'gradle':
-                        def proxy = ProxySettings.gradleArgs(steps, config)
-                        steps.sh(label: 'SonarQube Analysis', script: """
-                            ./gradlew sonarqube -Dsonar.projectKey=${projectKey} ${extraProps} ${proxy}
-                        """.stripIndent().trim())
+                        def proxyCli   = ProxySettings.gradleCliArgs(steps, config)
+                        def gradleOpts = "${config.stages?.build?.gradle?.gradleOpts ?: ''} " +
+                                         "${ProxySettings.gradleJvmOpts(steps, config)}".trim()
+                        steps.withEnv(gradleOpts.trim() ? ["GRADLE_OPTS=${gradleOpts.trim()}"] : []) {
+                            steps.sh(label: 'SonarQube Analysis', script: """
+                                ./gradlew sonarqube -Dsonar.projectKey=${projectKey} ${extraProps} ${proxyCli}
+                            """.stripIndent().trim())
+                        }
                         break
                     case 'maven':
                         steps.sh(label: 'SonarQube Analysis', script: """

@@ -14,24 +14,32 @@ class GradleBuilder implements BuildTool, Serializable {
     void build(Map config) {
         def gc    = config.stages?.build?.gradle ?: [:]
         def tasks = gc.tasks ?: 'clean build -x test'
-        def opts  = gc.gradleOpts ?: ''
-        def proxy = ProxySettings.gradleArgs(steps, config)
-
-        Toolchain.withJdk(steps, config, gc.jdkVersion as String) {
-            steps.sh(label: 'Gradle Build', script: "./gradlew ${tasks} ${opts} ${proxy}".trim())
-        }
+        runGradle(config, 'Gradle Build', tasks)
     }
 
     @Override
     void test(Map config) {
         def tc    = config.stages?.'unit-test'?.gradle ?: [:]
-        def gc    = config.stages?.build?.gradle ?: [:]
         def tasks = tc.tasks ?: 'test'
-        def opts  = gc.gradleOpts ?: ''
-        def proxy = ProxySettings.gradleArgs(steps, config)
+        runGradle(config, 'Gradle Test', tasks)
+    }
+
+    /**
+     * gradleOpts and proxy flags go into GRADLE_OPTS so the wrapper/launcher
+     * JVM gets them (the Gradle distribution download happens there); proxy
+     * flags are ALSO passed as CLI -D properties, which Gradle forwards to
+     * the daemon JVM for dependency resolution.
+     */
+    private void runGradle(Map config, String label, String tasks) {
+        def gc         = config.stages?.build?.gradle ?: [:]
+        def opts       = gc.gradleOpts ?: ''
+        def proxyCli   = ProxySettings.gradleCliArgs(steps, config)
+        def gradleOpts = "${opts} ${ProxySettings.gradleJvmOpts(steps, config)}".trim()
 
         Toolchain.withJdk(steps, config, gc.jdkVersion as String) {
-            steps.sh(label: 'Gradle Test', script: "./gradlew ${tasks} ${opts} ${proxy}".trim())
+            steps.withEnv(gradleOpts ? ["GRADLE_OPTS=${gradleOpts}"] : []) {
+                steps.sh(label: label, script: "./gradlew ${tasks} ${proxyCli}".trim())
+            }
         }
     }
 }
