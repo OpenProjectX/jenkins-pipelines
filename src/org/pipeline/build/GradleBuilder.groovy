@@ -1,5 +1,7 @@
 package org.pipeline.build
 
+import org.pipeline.utils.Toolchain
+
 class GradleBuilder implements BuildTool, Serializable {
     private final def steps
 
@@ -13,7 +15,7 @@ class GradleBuilder implements BuildTool, Serializable {
         def tasks = gc.tasks ?: 'clean build -x test'
         def opts  = gc.gradleOpts ?: ''
 
-        withJdk(gc.jdkVersion) {
+        Toolchain.withJdk(steps, config, gc.jdkVersion as String) {
             steps.sh(label: 'Gradle Build', script: "./gradlew ${tasks} ${opts}".trim())
         }
     }
@@ -25,19 +27,8 @@ class GradleBuilder implements BuildTool, Serializable {
         def tasks = tc.tasks ?: 'test'
         def opts  = gc.gradleOpts ?: ''
 
-        withJdk(gc.jdkVersion) {
+        Toolchain.withJdk(steps, config, gc.jdkVersion as String) {
             steps.sh(label: 'Gradle Test', script: "./gradlew ${tasks} ${opts}".trim())
-        }
-    }
-
-    private void withJdk(String version, Closure body) {
-        if (version) {
-            def jdkHome = steps.tool(name: "jdk-${version}", type: 'jdk')
-            steps.withEnv(["JAVA_HOME=${jdkHome}", "PATH+JDK=${jdkHome}/bin"]) {
-                body()
-            }
-        } else {
-            body()
         }
     }
 }

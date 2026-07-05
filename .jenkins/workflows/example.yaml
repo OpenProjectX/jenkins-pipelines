@@ -26,9 +26,14 @@ stages:
   build:
     enabled: true
     tool: gradle                 # gradle | maven | nodejs
+    # On Kubernetes pod agents, run build/test/scan steps inside this pod
+    # container (its image provides the JDK/tools). Ignored on classic agents,
+    # which fall back to jdkVersion / nodeVersion tool installations instead —
+    # set both to support both agent types with one config.
+    container: jdk17
     gradle:
       tasks: "clean build -x test"
-      jdkVersion: "17"
+      jdkVersion: "17"           # classic agents: Jenkins JDK tool named "jdk-17"
       gradleOpts: "-Xmx2g -Dfile.encoding=UTF-8"
     # maven:
     #   goals: "clean package -DskipTests"

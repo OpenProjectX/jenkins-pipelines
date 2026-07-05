@@ -1,5 +1,7 @@
 package org.pipeline.build
 
+import org.pipeline.utils.Toolchain
+
 class MavenBuilder implements BuildTool, Serializable {
     private final def steps
 
@@ -15,9 +17,11 @@ class MavenBuilder implements BuildTool, Serializable {
         def profiles = mc.profiles ? "-P${(mc.profiles as List).join(',')}" : ''
         def settings = mc.settingsId ? "--settings ${mc.settingsId}" : ''
 
-        steps.withEnv(["MAVEN_OPTS=${opts}"]) {
-            withMavenSettings(mc.settingsId) {
-                steps.sh(label: 'Maven Build', script: "mvn ${goals} ${profiles} ${settings}".trim())
+        Toolchain.withJdk(steps, config, mc.jdkVersion as String) {
+            steps.withEnv(["MAVEN_OPTS=${opts}"]) {
+                withMavenSettings(mc.settingsId) {
+                    steps.sh(label: 'Maven Build', script: "mvn ${goals} ${profiles} ${settings}".trim())
+                }
             }
         }
     }
@@ -29,9 +33,11 @@ class MavenBuilder implements BuildTool, Serializable {
         def goals = tc.goals ?: 'test'
         def opts  = mc.mavenOpts ?: '-Xmx2g'
 
-        steps.withEnv(["MAVEN_OPTS=${opts}"]) {
-            withMavenSettings(mc.settingsId) {
-                steps.sh(label: 'Maven Test', script: "mvn ${goals}")
+        Toolchain.withJdk(steps, config, mc.jdkVersion as String) {
+            steps.withEnv(["MAVEN_OPTS=${opts}"]) {
+                withMavenSettings(mc.settingsId) {
+                    steps.sh(label: 'Maven Test', script: "mvn ${goals}")
+                }
             }
         }
     }

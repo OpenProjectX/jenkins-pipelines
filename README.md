@@ -100,9 +100,10 @@ Set `stages.build.tool` and configure the matching block:
 ```yaml
 build:
   tool: gradle            # gradle | maven | nodejs
+  container: jdk17        # k8s pod agents only: run build/test/scan in this pod container
   gradle:
     tasks: "clean build -x test"
-    jdkVersion: "17"      # uses the Jenkins JDK tool named "jdk-<version>"
+    jdkVersion: "17"      # classic agents only: Jenkins JDK tool named "jdk-<version>"
     gradleOpts: "-Xmx2g"
   maven:
     goals: "clean package -DskipTests"
@@ -117,6 +118,8 @@ build:
 ```
 
 Unit-test commands are configured separately under `stages.unit-test.<tool>` (`gradle.tasks`, `maven.goals`, `nodejs.testScript`).
+
+**Kubernetes vs classic agents.** The library supports both with one config. On a Kubernetes pod agent (detected via `KUBERNETES_SERVICE_HOST`), setting `build.container` runs build, unit-test, and Sonar steps inside that pod container — the container image supplies the JDK/Node, so no Jenkins tool installation is needed. On a classic agent, `container` is ignored and the library falls back to Jenkins tool installations: `jdkVersion: "17"` → JDK tool `jdk-17`, `nodeVersion: "20"` → NodeJS installation `NodeJS-20`. Set both fields to make the same workflow file portable across agent types.
 
 ### Scanning
 
