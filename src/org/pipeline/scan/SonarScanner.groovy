@@ -1,5 +1,6 @@
 package org.pipeline.scan
 
+import org.pipeline.utils.ProxySettings
 import org.pipeline.utils.Toolchain
 
 class SonarScanner implements Serializable {
@@ -24,8 +25,9 @@ class SonarScanner implements Serializable {
             Toolchain.withJdk(steps, config, jdkVersion as String) {
                 switch (buildTool) {
                     case 'gradle':
+                        def proxy = ProxySettings.gradleArgs(steps, config)
                         steps.sh(label: 'SonarQube Analysis', script: """
-                            ./gradlew sonarqube -Dsonar.projectKey=${projectKey} ${extraProps}
+                            ./gradlew sonarqube -Dsonar.projectKey=${projectKey} ${extraProps} ${proxy}
                         """.stripIndent().trim())
                         break
                     case 'maven':

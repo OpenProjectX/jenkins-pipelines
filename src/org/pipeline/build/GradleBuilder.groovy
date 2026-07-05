@@ -1,5 +1,6 @@
 package org.pipeline.build
 
+import org.pipeline.utils.ProxySettings
 import org.pipeline.utils.Toolchain
 
 class GradleBuilder implements BuildTool, Serializable {
@@ -14,9 +15,10 @@ class GradleBuilder implements BuildTool, Serializable {
         def gc    = config.stages?.build?.gradle ?: [:]
         def tasks = gc.tasks ?: 'clean build -x test'
         def opts  = gc.gradleOpts ?: ''
+        def proxy = ProxySettings.gradleArgs(steps, config)
 
         Toolchain.withJdk(steps, config, gc.jdkVersion as String) {
-            steps.sh(label: 'Gradle Build', script: "./gradlew ${tasks} ${opts}".trim())
+            steps.sh(label: 'Gradle Build', script: "./gradlew ${tasks} ${opts} ${proxy}".trim())
         }
     }
 
@@ -26,9 +28,10 @@ class GradleBuilder implements BuildTool, Serializable {
         def gc    = config.stages?.build?.gradle ?: [:]
         def tasks = tc.tasks ?: 'test'
         def opts  = gc.gradleOpts ?: ''
+        def proxy = ProxySettings.gradleArgs(steps, config)
 
         Toolchain.withJdk(steps, config, gc.jdkVersion as String) {
-            steps.sh(label: 'Gradle Test', script: "./gradlew ${tasks} ${opts}".trim())
+            steps.sh(label: 'Gradle Test', script: "./gradlew ${tasks} ${opts} ${proxy}".trim())
         }
     }
 }

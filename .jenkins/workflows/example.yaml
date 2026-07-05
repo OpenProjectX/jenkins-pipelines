@@ -35,6 +35,13 @@ stages:
       tasks: "clean build -x test"
       jdkVersion: "17"           # classic agents: Jenkins JDK tool named "jdk-17"
       gradleOpts: "-Xmx2g -Dfile.encoding=UTF-8"
+      # HTTP proxy is auto-detected from HTTP(S)_PROXY / NO_PROXY env on the
+      # agent and passed to Gradle as JVM -D flags; set this block only to
+      # override that:
+      # proxy:
+      #   host: 192.168.0.89
+      #   port: 10809
+      #   noProxy: "localhost,127.0.0.1,.svc.cluster.local"
     # maven:
     #   goals: "clean package -DskipTests"
     #   mavenOpts: "-Xmx2g"

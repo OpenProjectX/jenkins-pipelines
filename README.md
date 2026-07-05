@@ -105,6 +105,10 @@ build:
     tasks: "clean build -x test"
     jdkVersion: "17"      # classic agents only: Jenkins JDK tool named "jdk-<version>"
     gradleOpts: "-Xmx2g"
+    proxy:                # optional override; auto-detected from agent env by default
+      host: 192.168.0.89
+      port: 10809
+      noProxy: "localhost,127.0.0.1,.svc.cluster.local"
   maven:
     goals: "clean package -DskipTests"
     mavenOpts: "-Xmx2g"
@@ -118,6 +122,8 @@ build:
 ```
 
 Unit-test commands are configured separately under `stages.unit-test.<tool>` (`gradle.tasks`, `maven.goals`, `nodejs.testScript`).
+
+**HTTP proxy.** Plain `http_proxy`/`no_proxy` env vars are ignored by the JVM, so the library translates proxy settings into JVM flags (`-Dhttp(s).proxyHost/Port`, `-Dhttp.nonProxyHosts`) appended to the Gradle command line for build, unit-test, and Sonar steps. By default it reads the standard `HTTP(S)_PROXY` / `NO_PROXY` env vars on the agent (set cluster-wide, e.g. in the pod template), so no per-repo config is needed; a `gradle.proxy` block overrides the env. `NO_PROXY` entries are converted (`,` → `|`, leading `.` → `*.`); CIDR ranges are dropped since the JVM cannot express them.
 
 **Kubernetes vs classic agents.** The library supports both with one config. On a Kubernetes pod agent (detected via `KUBERNETES_SERVICE_HOST`), setting `build.container` runs build, unit-test, and Sonar steps inside that pod container — the container image supplies the JDK/Node, so no Jenkins tool installation is needed. On a classic agent, `container` is ignored and the library falls back to Jenkins tool installations: `jdkVersion: "17"` → JDK tool `jdk-17`, `nodeVersion: "20"` → NodeJS installation `NodeJS-20`. Set both fields to make the same workflow file portable across agent types.
 
