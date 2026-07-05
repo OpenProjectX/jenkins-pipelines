@@ -165,3 +165,5 @@ gradle-app.setting
 
 # End of https://www.toptal.com/developers/gitignore/api/jetbrains,groovy,gradle
 /.idea/
+/lib/
+/implement-md.md
