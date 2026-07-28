@@ -29,15 +29,23 @@ class GradleBuilder implements BuildTool, Serializable {
      * JVM gets them (the Gradle distribution download happens there); proxy
      * flags are ALSO passed as CLI -D properties, which Gradle forwards to
      * the daemon JVM for dependency resolution.
+     *
+     * JENKINS_NODE_COOKIE=dontKillMe exempts the Gradle (and Kotlin) daemons
+     * from Jenkins' ProcessTreeKiller at the end of the build, so they stay
+     * warm on long-running agents and later builds reuse them.
      */
     private void runGradle(Map config, String label, String tasks) {
         def gc         = config.stages?.build?.gradle ?: [:]
         def opts       = gc.gradleOpts ?: ''
         def proxyCli   = ProxySettings.gradleCliArgs(steps, config)
         def gradleOpts = "${opts} ${ProxySettings.gradleJvmOpts(steps, config)}".trim()
+        def envVars    = ['JENKINS_NODE_COOKIE=dontKillMe']
+        if (gradleOpts) {
+            envVars << "GRADLE_OPTS=${gradleOpts}"
+        }
 
         Toolchain.withJdk(steps, config, gc.jdkVersion as String) {
-            steps.withEnv(gradleOpts ? ["GRADLE_OPTS=${gradleOpts}"] : []) {
+            steps.withEnv(envVars) {
                 steps.sh(label: label, script: "./gradlew ${tasks} ${proxyCli}".trim())
             }
         }

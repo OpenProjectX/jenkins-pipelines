@@ -28,7 +28,11 @@ class SonarScanner implements Serializable {
                         def proxyCli   = ProxySettings.gradleCliArgs(steps, config)
                         def gradleOpts = "${config.stages?.build?.gradle?.gradleOpts ?: ''} " +
                                          "${ProxySettings.gradleJvmOpts(steps, config)}".trim()
-                        steps.withEnv(gradleOpts.trim() ? ["GRADLE_OPTS=${gradleOpts.trim()}"] : []) {
+                        def envVars    = ['JENKINS_NODE_COOKIE=dontKillMe']
+                        if (gradleOpts.trim()) {
+                            envVars << "GRADLE_OPTS=${gradleOpts.trim()}"
+                        }
+                        steps.withEnv(envVars) {
                             steps.sh(label: 'SonarQube Analysis', script: """
                                 ./gradlew sonarqube -Dsonar.projectKey=${projectKey} ${extraProps} ${proxyCli}
                             """.stripIndent().trim())

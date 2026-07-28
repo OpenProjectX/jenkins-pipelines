@@ -59,7 +59,8 @@ stages:
       tasks: "test jacocoTestReport"
     reports:
       junit: "**/build/test-results/**/*.xml"
-    # archiveArtifacts: "**/build/reports/tests/**"   # keep browsable HTML reports on the build page
+    # archiveArtifacts: "**/build/reports/tests/**"   # keep HTML reports on the build page
+    # archiveTar: true             # bundle matches into one <stage>-reports.tar.gz (or set a custom name)
 
   # ── Scan ─────────────────────────────────────────────────────────────────────
   scan:

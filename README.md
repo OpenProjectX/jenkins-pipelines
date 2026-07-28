@@ -130,9 +130,12 @@ unit-test:
   reports:
     junit: "**/build/test-results/**/*.xml"
   archiveArtifacts: "**/build/reports/tests/**"
+  archiveTar: true    # bundle matches into unit-test-reports.tar.gz (string overrides the name)
 ```
 
-Both the junit recording and the archiving run in a `finally` block, so reports are captured even when tests fail — which is exactly when you want them.
+Both the junit recording and the archiving run in a `finally` block, so reports are captured even when tests fail — which is exactly when you want them. HTML report trees are hundreds of small files and each archived file is stored individually on the controller; `archiveTar` bundles everything matching the glob into a single `<stage>-reports.tar.gz` first, which archives far faster.
+
+**Gradle daemon reuse.** Jenkins' ProcessTreeKiller kills every process spawned by a build when its `node` block ends — including the Gradle and Kotlin daemons, which defeats daemon reuse on long-running agents. The library therefore launches Gradle with `JENKINS_NODE_COOKIE=dontKillMe`, exempting those daemons from the kill. Subsequent builds on the same agent pod connect to the warm daemon (`Connecting to Daemon` in the log with `--info`) instead of paying startup + JIT warmup each time.
 
 **HTTP proxy.** Plain `http_proxy`/`no_proxy` env vars are ignored by the JVM, so the library translates proxy settings into JVM flags (`-Dhttp(s).proxyHost/Port`, `-Dhttp.nonProxyHosts`) for build, unit-test, and Sonar steps. Gradle runs in two JVMs, so the flags are delivered on two channels: via the `GRADLE_OPTS` env var for the wrapper/launcher JVM (which downloads the Gradle distribution and ignores CLI `-D` args), and as CLI `-D` properties for the daemon JVM (which resolves dependencies). By default the library reads the standard `HTTP(S)_PROXY` / `NO_PROXY` env vars on the agent (set cluster-wide, e.g. in the pod template), so no per-repo config is needed; a `gradle.proxy` block overrides the env. `NO_PROXY` entries are converted (`,` → `|`, leading `.` → `*.`); CIDR ranges are dropped since the JVM cannot express them.
 

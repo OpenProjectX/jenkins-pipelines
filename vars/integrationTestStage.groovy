@@ -13,8 +13,7 @@ def call(Map config) {
         if (junitPattern) {
             junit allowEmptyResults: true, testResults: junitPattern
         }
-        if (tc.archiveArtifacts) {
-            archiveArtifacts artifacts: tc.archiveArtifacts, allowEmptyArchive: true
-        }
+        def tarName = tc.archiveTar ? (tc.archiveTar instanceof String ? tc.archiveTar : 'integration-test-reports') : null
+        archiveStageArtifacts(tc.archiveArtifacts as String, tarName)
     }
 }

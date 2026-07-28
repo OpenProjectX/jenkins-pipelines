@@ -9,8 +9,7 @@ def call(Map config) {
         def tc      = config.stages?.'unit-test' ?: [:]
         def pattern = tc.reports?.junit ?: '**/build/test-results/**/*.xml'
         junit allowEmptyResults: true, testResults: pattern
-        if (tc.archiveArtifacts) {
-            archiveArtifacts artifacts: tc.archiveArtifacts, allowEmptyArchive: true
-        }
+        def tarName = tc.archiveTar ? (tc.archiveTar instanceof String ? tc.archiveTar : 'unit-test-reports') : null
+        archiveStageArtifacts(tc.archiveArtifacts as String, tarName)
     }
 }
