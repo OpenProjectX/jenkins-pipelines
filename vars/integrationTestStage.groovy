@@ -4,12 +4,17 @@ def call(Map config) {
     def timeoutM = tc.timeout ?: 30
 
     echo("[Integration Test] command=${command}")
-    timeout(time: timeoutM, unit: 'MINUTES') {
-        sh(label: 'Integration Test', script: command)
-    }
-
-    def junitPattern = tc.reports?.junit
-    if (junitPattern) {
-        junit allowEmptyResults: true, testResults: junitPattern
+    try {
+        timeout(time: timeoutM, unit: 'MINUTES') {
+            sh(label: 'Integration Test', script: command)
+        }
+    } finally {
+        def junitPattern = tc.reports?.junit
+        if (junitPattern) {
+            junit allowEmptyResults: true, testResults: junitPattern
+        }
+        if (tc.archiveArtifacts) {
+            archiveArtifacts artifacts: tc.archiveArtifacts, allowEmptyArchive: true
+        }
     }
 }

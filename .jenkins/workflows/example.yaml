@@ -59,6 +59,7 @@ stages:
       tasks: "test jacocoTestReport"
     reports:
       junit: "**/build/test-results/**/*.xml"
+    # archiveArtifacts: "**/build/reports/tests/**"   # keep browsable HTML reports on the build page
 
   # ── Scan ─────────────────────────────────────────────────────────────────────
   scan:
@@ -129,6 +130,7 @@ stages:
     timeout: 30
     reports:
       junit: "**/build/integration-test-results/**/*.xml"
+    # archiveArtifacts: "**/build/reports/integrationTest/**"
 
   # ── PR Gate ───────────────────────────────────────────────────────────────────
   pr-gate:

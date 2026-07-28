@@ -123,6 +123,17 @@ build:
 
 Unit-test commands are configured separately under `stages.unit-test.<tool>` (`gradle.tasks`, `maven.goals`, `nodejs.testScript`).
 
+**Test reports.** `reports.junit` on the `unit-test` / `integration-test` stages must point at JUnit **XML result files** (e.g. `**/build/test-results/**/*.xml`) — pointing it at HTML report folders breaks the parser. To keep the browsable HTML reports on the build page, set `archiveArtifacts` on the test stage (same Ant-glob semantics as the build stage; folders need a trailing `/**`):
+
+```yaml
+unit-test:
+  reports:
+    junit: "**/build/test-results/**/*.xml"
+  archiveArtifacts: "**/build/reports/tests/**"
+```
+
+Both the junit recording and the archiving run in a `finally` block, so reports are captured even when tests fail — which is exactly when you want them.
+
 **HTTP proxy.** Plain `http_proxy`/`no_proxy` env vars are ignored by the JVM, so the library translates proxy settings into JVM flags (`-Dhttp(s).proxyHost/Port`, `-Dhttp.nonProxyHosts`) for build, unit-test, and Sonar steps. Gradle runs in two JVMs, so the flags are delivered on two channels: via the `GRADLE_OPTS` env var for the wrapper/launcher JVM (which downloads the Gradle distribution and ignores CLI `-D` args), and as CLI `-D` properties for the daemon JVM (which resolves dependencies). By default the library reads the standard `HTTP(S)_PROXY` / `NO_PROXY` env vars on the agent (set cluster-wide, e.g. in the pod template), so no per-repo config is needed; a `gradle.proxy` block overrides the env. `NO_PROXY` entries are converted (`,` → `|`, leading `.` → `*.`); CIDR ranges are dropped since the JVM cannot express them.
 
 Note that `gradle.gradleOpts` is likewise passed via `GRADLE_OPTS` (JVM options like `-Xmx2g` are not valid Gradle CLI arguments).
