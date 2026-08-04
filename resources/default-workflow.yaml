@@ -31,11 +31,17 @@ stages:
       tasks: "clean build -x test"
       jdkVersion: "17"
       gradleOpts: "-Xmx2g"
+    docker:
+      context: "."
+      dockerfile: Dockerfile
+      buildKit: true
+      push: false
 
   unit-test:
     enabled: true
     gradle:
       tasks: "test"
+    docker: {}
     reports:
       junit: "**/build/test-results/**/*.xml"
 

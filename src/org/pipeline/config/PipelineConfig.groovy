@@ -35,6 +35,12 @@ class PipelineConfig implements Serializable {
                 nodejs  : [
                     packageManager: 'npm',
                     buildScript   : 'build'
+                ],
+                docker  : [
+                    context    : '.',
+                    dockerfile : 'Dockerfile',
+                    buildKit   : true,
+                    push       : false
                 ]
             ],
             'unit-test'       : [
@@ -42,6 +48,7 @@ class PipelineConfig implements Serializable {
                 gradle : [tasks: 'test'],
                 maven  : [goals: 'test'],
                 nodejs : [testScript: 'test'],
+                docker : [:],
                 reports: [
                     junit: '**/build/test-results/**/*.xml'
                 ]

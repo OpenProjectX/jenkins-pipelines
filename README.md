@@ -60,7 +60,7 @@ Stages run in this order. Each is driven by its section under `stages:` in the w
 | Stage | Enabled by default | What it does |
 |---|---|---|
 | Checkout | yes | `checkout scm`, optional submodules / Git LFS, prints commit info |
-| Build | yes | Builds with the configured tool (`gradle` \| `maven` \| `nodejs`), optionally archives artifacts |
+| Build | yes | Builds with the configured tool (`gradle` \| `maven` \| `nodejs` \| `docker`), optionally archives artifacts |
 | Unit Test | yes | Runs tests with the same tool, always publishes JUnit results |
 | Scan | no | SonarQube analysis (with quality-gate wait) and/or Trivy image scan; runs both in parallel when both are enabled |
 | Deploy | no | Deploys to every environment whose `branches` patterns match the current branch, via `helm` or `kustomize` |
@@ -99,7 +99,7 @@ Set `stages.build.tool` and configure the matching block:
 
 ```yaml
 build:
-  tool: gradle            # gradle | maven | nodejs
+  tool: gradle            # gradle | maven | nodejs | docker
   # container: jdk17      # legacy k8s sidecar only; omit for the all-in-one jnlp agent
   gradle:
     tasks: "clean build -x test"
@@ -118,10 +118,56 @@ build:
     nodeVersion: "22"     # k8s all-in-one: NODE22_HOME; classic: NodeJS installation "NodeJS-22"
     packageManager: npm   # npm | yarn
     buildScript: build
+  docker:
+    context: "."
+    dockerfile: Dockerfile
+    image: ghcr.io/openprojectx/my-service
+    tag: "${IMAGE_TAG}"   # default: IMAGE_TAG, then BUILD_NUMBER, then latest
+    buildKit: true        # enables Dockerfile RUN --mount=type=cache
+    push: true
+    registry:
+      url: ghcr.io
+      credentialsId: ghcr-token  # Jenkins username/password credential id
+    buildArgs:
+      PYTHON_VERSION: "3.12"
+    labels:
+      org.opencontainers.image.source: "${GIT_URL}"
   archiveArtifacts: "**/build/libs/*.jar"
 ```
 
-Unit-test commands are configured separately under `stages.unit-test.<tool>` (`gradle.tasks`, `maven.goals`, `nodejs.testScript`).
+Unit-test commands are configured separately under `stages.unit-test.<tool>` (`gradle.tasks`, `maven.goals`, `nodejs.testScript`, `docker.command`). Docker builds skip unit tests unless `unit-test.docker.command` is set.
+
+**Docker builds.** The Docker build tool runs `docker build` with BuildKit enabled by default, tags the image from `docker.tags` or `docker.image` + `docker.tag`, and optionally pushes every tag when `push: true`. Registry credentials are Jenkins-local: put only the `credentialsId` in YAML, never the token itself.
+
+```yaml
+build:
+  tool: docker
+  docker:
+    image: ghcr.io/openprojectx/python-api
+    tag: "${IMAGE_TAG}"
+    push: true
+    registry:
+      url: ghcr.io
+      credentialsId: ghcr-token
+unit-test:
+  enabled: false   # or set docker.command and reports.junit when the image emits JUnit XML
+  docker:
+    command: "docker run --rm ghcr.io/openprojectx/python-api:${IMAGE_TAG} pytest"
+```
+
+For Python/Node dependency cache during Docker builds, use BuildKit cache mounts in the Dockerfile. Use `sharing=locked` for caches that may be written by concurrent builds:
+
+```dockerfile
+# syntax=docker/dockerfile:1.7
+
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    pip install -r requirements.txt
+
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm ci
+```
+
+On the recommended Kubernetes agent, `/var/lib/docker` is backed by the Jenkins agent Docker-cache PVC, so pulled images and BuildKit cache data survive agent pod replacement.
 
 **Test reports.** `reports.junit` on the `unit-test` / `integration-test` stages must point at JUnit **XML result files** (e.g. `**/build/test-results/**/*.xml`) — pointing it at HTML report folders breaks the parser. To keep the browsable HTML reports on the build page, set `archiveArtifacts` on the test stage (same Ant-glob semantics as the build stage; folders need a trailing `/**`):
 
@@ -254,6 +300,6 @@ All classes take the pipeline `steps` object in their constructor and must imple
 Controller/agent tooling assumed by the stages you enable:
 
 - **Plugins**: Pipeline Utility Steps (`readYaml`), AnsiColor, JUnit, Workspace Cleanup; SonarQube Scanner (`withSonarQubeEnv`), GitHub Notify (`githubNotify`), Bitbucket Build Status Notifier (`bitbucketStatusNotify`), Config File Provider (Maven `settingsId`), NodeJS plugin — each only if the matching feature is used.
-- **Agent tools**: `git` (plus `git-lfs` if enabled), the selected build tool (`./gradlew` wrapper, `./mvnw` or `mvn`, node/npm/yarn), `trivy`, `helm`, `kubectl` as applicable. For Kubernetes pod agents, the recommended `jnlp` image is `ghcr.io/openprojectx/jenkins-build-agent:latest`.
+- **Agent tools**: `git` (plus `git-lfs` if enabled), the selected build tool (`./gradlew` wrapper, `./mvnw` or `mvn`, node/npm/yarn, docker), `trivy`, `helm`, `kubectl` as applicable. For Kubernetes pod agents, the recommended `jnlp` image is `ghcr.io/openprojectx/jenkins-build-agent:latest`.
 - **Tool installations**: JDKs named `jdk-<version>` and NodeJS installations named `NodeJS-<version>` when `jdkVersion`/`nodeVersion` are set.
 - **Credentials**: kubeconfig file credentials for deploy; GitHub/Bitbucket tokens for the PR gate.
