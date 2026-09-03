@@ -24,6 +24,18 @@ stages:
   build:
     enabled: true
     tool: gradle
+    # Optional: inject arbitrary Jenkins credentials as masked env vars for the
+    # build stage (any tool). Secret text, username/password, and secret file
+    # bindings are supported. unit-test inherits this list unless it defines
+    # its own.
+    # credentials:
+    #   - credentialsId: npm-token
+    #     envVar: NPM_TOKEN
+    #   - credentialsId: harbor-login
+    #     usernameVar: REG_USER
+    #     passwordVar: REG_PASS
+    #   - credentialsId: some-file
+    #     variable: MY_SECRET_FILE
     # Omit container when the Kubernetes pod template uses the all-in-one
     # ghcr.io/openprojectx/jenkins-build-agent image as its jnlp container.
     # Set container only for legacy sidecar pod templates, e.g. container: jdk17.

@@ -14,7 +14,38 @@ class GradleBuilder implements BuildTool, Serializable {
     void build(Map config) {
         def gc    = config.stages?.build?.gradle ?: [:]
         def tasks = gc.tasks ?: 'clean build -x test'
-        runGradle(config, 'Gradle Build', tasks)
+        withRegistryCredentials(config) {
+            runGradle(config, 'Gradle Build', tasks)
+        }
+    }
+
+    /**
+     * Optional registry login for in-Gradle image publishing (e.g. Jib pushing
+     * to Harbor). When stages.build.registry.credentialsId is set, the build
+     * runs with DOCKER_REGISTRY_USER / DOCKER_REGISTRY_PASSWORD in the
+     * environment - the same variable names DockerBuilder uses, so tasks can
+     * reference them via shell expansion:
+     *
+     *   tasks: ":app:build -Dquarkus.container-image.push=true " +
+     *          "-Dquarkus.container-image.username=\$DOCKER_REGISTRY_USER " +
+     *          "-Dquarkus.container-image.password=\$DOCKER_REGISTRY_PASSWORD"
+     *
+     * Without the block the build runs unchanged.
+     */
+    private void withRegistryCredentials(Map config, Closure body) {
+        def credentialsId = config.stages?.build?.registry?.credentialsId
+        if (!credentialsId) {
+            body()
+            return
+        }
+        steps.withCredentials([[
+            '$class'        : 'UsernamePasswordMultiBinding',
+            credentialsId   : credentialsId as String,
+            usernameVariable: 'DOCKER_REGISTRY_USER',
+            passwordVariable: 'DOCKER_REGISTRY_PASSWORD'
+        ]]) {
+            body()
+        }
     }
 
     @Override

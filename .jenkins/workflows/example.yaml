@@ -50,6 +50,18 @@ stages:
     #   nodeVersion: "20"
     #   packageManager: npm      # npm | yarn
     #   buildScript: build
+    # Optional: inject Jenkins credentials as masked env vars for the build.
+    # The credential must exist in Jenkins (global or folder scope) with a
+    # matching ID. Three binding shapes:
+    #   - credentialsId + envVar                  -> secret text, one env var
+    #   - credentialsId + usernameVar/passwordVar -> username/password pair
+    #   - credentialsId + variable                -> secret file (env var = path)
+    # credentials:
+    #   - credentialsId: npm-token
+    #     envVar: NPM_TOKEN
+    #   - credentialsId: harbor-login
+    #     usernameVar: REG_USER
+    #     passwordVar: REG_PASS
     archiveArtifacts: "**/build/libs/*.jar"
 
   # ── Release Metadata ────────────────────────────────────────────────────────
@@ -71,6 +83,9 @@ stages:
   # ── Unit Test ────────────────────────────────────────────────────────────────
   unit-test:
     enabled: true
+    # credentials:               # defaults to the build stage list when unset
+    #   - credentialsId: test-db-password
+    #     envVar: TEST_DB_PASSWORD
     gradle:
       tasks: "test jacocoTestReport"
     reports:
