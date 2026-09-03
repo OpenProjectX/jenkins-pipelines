@@ -1,5 +1,7 @@
 package org.pipeline.deploy
 
+import org.pipeline.utils.EnvTemplate
+
 class KustomizeDeployer implements Deployer, Serializable {
     private final def steps
 
@@ -10,9 +12,10 @@ class KustomizeDeployer implements Deployer, Serializable {
     @Override
     void deploy(Map environment, Map config) {
         def kc        = environment.kustomize ?: [:]
-        def path      = kc.path      ?: './k8s'
-        def namespace = kc.namespace ?: 'default'
-        def ctxArg    = kc.kubeContext ? "--context ${kc.kubeContext}" : ''
+        def path      = EnvTemplate.resolve(kc.path ?: './k8s', steps)
+        def namespace = EnvTemplate.resolve(kc.namespace ?: 'default', steps)
+        def kubeCtx   = EnvTemplate.resolve(kc.kubeContext, steps)
+        def ctxArg    = kubeCtx ? "--context ${kubeCtx}" : ''
         def credId    = environment.kubeCredentialsId ?: config.stages?.deploy?.kubeCredentialsId
 
         withKubeCredentials(credId) {
@@ -26,8 +29,9 @@ class KustomizeDeployer implements Deployer, Serializable {
     @Override
     void rollback(Map environment, Map config) {
         def kc        = environment.kustomize ?: [:]
-        def namespace = kc.namespace ?: 'default'
-        def ctxArg    = kc.kubeContext ? "--context ${kc.kubeContext}" : ''
+        def namespace = EnvTemplate.resolve(kc.namespace ?: 'default', steps)
+        def kubeCtx   = EnvTemplate.resolve(kc.kubeContext, steps)
+        def ctxArg    = kubeCtx ? "--context ${kubeCtx}" : ''
         def credId    = environment.kubeCredentialsId ?: config.stages?.deploy?.kubeCredentialsId
 
         withKubeCredentials(credId) {

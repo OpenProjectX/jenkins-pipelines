@@ -58,6 +58,12 @@ private void runPipeline(Map params) {
         timeout(time: config.options?.timeout ?: 60, unit: 'MINUTES') {
             ansiColor('xterm') {
 
+                if (config.stages?.release?.enabled == true) {
+                    stage('Release') {
+                        releaseStage(config)
+                    }
+                }
+
                 if (config.stages?.build?.enabled != false) {
                     stage('Build') {
                         buildStage(config)

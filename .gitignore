@@ -168,3 +168,5 @@ gradle-app.setting
 /lib/
 /implement-md.md
 /http-client.private.env.json
+/.codex/
+/.claude/

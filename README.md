@@ -60,6 +60,7 @@ Stages run in this order. Each is driven by its section under `stages:` in the w
 | Stage | Enabled by default | What it does |
 |---|---|---|
 | Checkout | yes | `checkout scm`, optional submodules / Git LFS, prints commit info |
+| Release | no | Classifies the build as `snapshot` or `formal` and exports `RELEASE_TYPE`, `RELEASE_VERSION`, `IMAGE_TAG`, `BRANCH_SLUG`, and `SHORT_SHA` |
 | Build | yes | Builds with the configured tool (`gradle` \| `maven` \| `nodejs` \| `docker`), optionally archives artifacts |
 | Unit Test | yes | Runs tests with the same tool, always publishes JUnit results |
 | Scan | no | SonarQube analysis (with quality-gate wait) and/or Trivy image scan; runs both in parallel when both are enabled |
@@ -72,7 +73,7 @@ Notes on stage semantics:
 - Most stages are opt-out (`enabled: false` to skip); **Trivy, deploy, and integration-test are opt-in** (`enabled: true` to run).
 - The PR Gate only runs when `env.CHANGE_ID` is set, i.e. on multibranch PR builds.
 - Deploy branch patterns support globs: `*` matches within a path segment, `**` matches across segments (e.g. `feature/*`, `release/**`).
-- Environment variables like `${IMAGE_TAG}` in the YAML are resolved by `readYaml`/shell at runtime; make sure they are set on the build.
+- Environment variables like `${IMAGE_TAG}` / `${RELEASE_VERSION}` in Docker tags, Docker build args/labels, Helm values, and Kustomize paths are resolved from the Jenkins environment at runtime.
 
 ## Configuration
 
@@ -136,6 +137,69 @@ build:
 ```
 
 Unit-test commands are configured separately under `stages.unit-test.<tool>` (`gradle.tasks`, `maven.goals`, `nodejs.testScript`, `docker.command`). Docker builds skip unit tests unless `unit-test.docker.command` is set.
+
+### Release Metadata
+
+The optional `release` stage runs before build/deploy and creates consistent SDLC metadata for downstream stages:
+
+```yaml
+release:
+  enabled: true
+  defaultType: snapshot
+  snapshot:
+    branches: ["feature/*", "sandbox/*", "develop"]
+    version: "0.0.0-${BRANCH_SLUG}.${BUILD_NUMBER}.${SHORT_SHA}"
+    imageTag: "${RELEASE_VERSION}"
+  formal:
+    branches: ["main", "master"]
+    tags: ["v*"]
+    version: "${TAG_NAME}"
+    imageTag: "${RELEASE_VERSION}"
+```
+
+It exports:
+
+| Variable | Example | Meaning |
+|---|---|---|
+| `RELEASE_TYPE` | `snapshot` / `formal` | Branch/tag classification |
+| `RELEASE_VERSION` | `0.0.0-feature-auth.42.abc123` / `1.2.3` | Artifact/chart version |
+| `IMAGE_TAG` | same as `RELEASE_VERSION` by default | Docker image tag used by Docker builds and Helm deploys |
+| `BRANCH_SLUG` | `feature-auth` | DNS/tag-safe branch name |
+| `SHORT_SHA` | `abc123def456` | 12-character Git SHA |
+
+Formal tag builds normalize a leading `v`, so `v1.2.3` becomes `RELEASE_VERSION=1.2.3`. If a formal branch build has no `TAG_NAME`, the fallback version is `${BUILD_NUMBER}.${SHORT_SHA}`; for production releases, prefer tag-triggered builds or override `formal.version` from your own version file/tool.
+
+Docker and deploy configs can consume these values directly:
+
+```yaml
+build:
+  tool: docker
+  docker:
+    image: ghcr.io/openprojectx/my-service
+    tag: "${IMAGE_TAG}"
+    push: true
+
+deploy:
+  enabled: true
+  environments:
+    - name: dev
+      branches: ["feature/*", "sandbox/*", "develop"]
+      tool: helm
+      helm:
+        release: "my-service-${BRANCH_SLUG}"
+        namespace: dev
+        set:
+          image.tag: "${IMAGE_TAG}"
+    - name: prod
+      branches: ["main", "master"]
+      tool: helm
+      helm:
+        release: my-service
+        namespace: prod
+        set:
+          image.tag: "${IMAGE_TAG}"
+        extraArgs: "--atomic --wait --timeout 10m"
+```
 
 **Docker builds.** The Docker build tool runs `docker build` with BuildKit enabled by default, tags the image from `docker.tags` or `docker.image` + `docker.tag`, and optionally pushes every tag when `push: true`. Registry credentials are Jenkins-local: put only the `credentialsId` in YAML, never the token itself.
 
@@ -265,6 +329,7 @@ At the start of a PR build the gate posts a *pending/in-progress* status; in the
 vars/                        # Pipeline steps (the library's public API)
   ciPipeline.groovy          #   Entry point: orchestrates all stages
   checkoutStage.groovy       #   One step per stage, each takes the merged config
+  releaseStage.groovy
   buildStage.groovy
   unitTestStage.groovy
   scanStage.groovy
@@ -278,6 +343,7 @@ src/org/pipeline/
   scan/                      # SonarScanner, TrivyScanner
   prgate/                    # PrGate interface, factory, GitHub/Bitbucket gates
   utils/Logger.groovy        # ANSI-colored log helper (debug gated on PIPELINE_DEBUG=true)
+  utils/EnvTemplate.groovy    # Runtime ${VAR} interpolation for YAML values
 resources/default-workflow.yaml   # Reference copy of the library defaults
 .jenkins/workflows/example.yaml   # Fully annotated example workflow for consumers
 Jenkinsfile                  # Runs the library's own validation build

@@ -1,5 +1,7 @@
 package org.pipeline.deploy
 
+import org.pipeline.utils.EnvTemplate
+
 class HelmDeployer implements Deployer, Serializable {
     private final def steps
 
@@ -10,13 +12,13 @@ class HelmDeployer implements Deployer, Serializable {
     @Override
     void deploy(Map environment, Map config) {
         def hc         = environment.helm ?: [:]
-        def release    = hc.release    ?: environment.name
-        def namespace  = hc.namespace  ?: 'default'
-        def chart      = hc.chart      ?: './chart'
+        def release    = EnvTemplate.resolve(hc.release ?: environment.name, steps)
+        def namespace  = EnvTemplate.resolve(hc.namespace ?: 'default', steps)
+        def chart      = EnvTemplate.resolve(hc.chart ?: './chart', steps)
         def extraArgs  = hc.extraArgs  ?: '--wait --timeout 10m'
-        def kubeCtx    = hc.kubeContext
+        def kubeCtx    = EnvTemplate.resolve(hc.kubeContext, steps)
         def ctxArg     = kubeCtx ? "--kube-context ${kubeCtx}" : ''
-        def valuesArgs = (hc.values ?: []).collect { "-f ${it}" }.join(' ')
+        def valuesArgs = EnvTemplate.resolveList(hc.values ?: [], steps).collect { "-f ${shellQuote(it)}" }.join(' ')
         def setArgs    = buildSetArgs(hc.set ?: [:])
         def credId     = environment.kubeCredentialsId ?: config.stages?.deploy?.kubeCredentialsId
 
@@ -32,9 +34,10 @@ class HelmDeployer implements Deployer, Serializable {
     @Override
     void rollback(Map environment, Map config) {
         def hc        = environment.helm ?: [:]
-        def release   = hc.release   ?: environment.name
-        def namespace = hc.namespace ?: 'default'
-        def ctxArg    = hc.kubeContext ? "--kube-context ${hc.kubeContext}" : ''
+        def release   = EnvTemplate.resolve(hc.release ?: environment.name, steps)
+        def namespace = EnvTemplate.resolve(hc.namespace ?: 'default', steps)
+        def kubeCtx   = EnvTemplate.resolve(hc.kubeContext, steps)
+        def ctxArg    = kubeCtx ? "--kube-context ${kubeCtx}" : ''
         def credId    = environment.kubeCredentialsId ?: config.stages?.deploy?.kubeCredentialsId
 
         withKubeCredentials(credId) {
@@ -44,9 +47,12 @@ class HelmDeployer implements Deployer, Serializable {
         }
     }
 
-    @NonCPS
-    private static String buildSetArgs(Map setMap) {
-        setMap?.collect { k, v -> "--set ${k}=${v}" }?.join(' ') ?: ''
+    private String buildSetArgs(Map setMap) {
+        EnvTemplate.resolveMap(setMap, steps)?.collect { k, v -> "--set ${k}=${shellQuote(v as String)}" }?.join(' ') ?: ''
+    }
+
+    private static String shellQuote(String value) {
+        "'${value.replace("'", "'\"'\"'")}'"
     }
 
     private void withKubeCredentials(String credId, Closure body) {

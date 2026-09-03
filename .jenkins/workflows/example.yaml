@@ -25,7 +25,7 @@ stages:
   # ── Build ────────────────────────────────────────────────────────────────────
   build:
     enabled: true
-    tool: gradle                 # gradle | maven | nodejs
+    tool: gradle                 # gradle | maven | nodejs | docker
     # On Kubernetes pod agents, run build/test/scan steps inside this pod
     # container (its image provides the JDK/tools). Ignored on classic agents,
     # which fall back to jdkVersion / nodeVersion tool installations instead —
@@ -51,6 +51,22 @@ stages:
     #   packageManager: npm      # npm | yarn
     #   buildScript: build
     archiveArtifacts: "**/build/libs/*.jar"
+
+  # ── Release Metadata ────────────────────────────────────────────────────────
+  # Optional SDLC metadata stage. It runs before build/deploy and exports:
+  # RELEASE_TYPE, RELEASE_VERSION, IMAGE_TAG, BRANCH_SLUG, SHORT_SHA.
+  release:
+    enabled: true
+    defaultType: snapshot
+    snapshot:
+      branches: ["feature/*", "sandbox/*", "develop"]
+      version: "0.0.0-${BRANCH_SLUG}.${BUILD_NUMBER}.${SHORT_SHA}"
+      imageTag: "${RELEASE_VERSION}"
+    formal:
+      branches: ["main", "master"]
+      tags: ["v*"]
+      version: "${TAG_NAME}"
+      imageTag: "${RELEASE_VERSION}"
 
   # ── Unit Test ────────────────────────────────────────────────────────────────
   unit-test:

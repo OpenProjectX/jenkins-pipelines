@@ -43,6 +43,19 @@ class PipelineConfig implements Serializable {
                     push       : false
                 ]
             ],
+            release           : [
+                enabled    : false,
+                defaultType: 'snapshot',
+                snapshot   : [
+                    branches: ['feature/*', 'sandbox/*', 'develop'],
+                    version : '0.0.0-${BRANCH_SLUG}.${BUILD_NUMBER}.${SHORT_SHA}'
+                ],
+                formal     : [
+                    branches: ['main', 'master'],
+                    tags    : ['v*'],
+                    version : '${TAG_NAME}'
+                ]
+            ],
             'unit-test'       : [
                 enabled: true,
                 gradle : [tasks: 'test'],

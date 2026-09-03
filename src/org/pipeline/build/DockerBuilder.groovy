@@ -1,5 +1,7 @@
 package org.pipeline.build
 
+import org.pipeline.utils.EnvTemplate
+
 class DockerBuilder implements BuildTool, Serializable {
     private final def steps
 
@@ -10,8 +12,8 @@ class DockerBuilder implements BuildTool, Serializable {
     @Override
     void build(Map config) {
         def dc          = config.stages?.build?.docker ?: [:]
-        def context     = dc.context ?: '.'
-        def dockerfile  = dc.dockerfile ?: 'Dockerfile'
+        def context     = EnvTemplate.resolve(dc.context ?: '.', steps)
+        def dockerfile  = EnvTemplate.resolve(dc.dockerfile ?: 'Dockerfile', steps)
         def buildKit    = dc.buildKit != false
         def tags        = imageTags(dc)
         def buildArgs   = dockerBuildArgs(dc, dockerfile, tags, context)
@@ -42,15 +44,15 @@ class DockerBuilder implements BuildTool, Serializable {
 
     private List<String> imageTags(Map dc) {
         if (dc.tags) {
-            return (dc.tags instanceof List ? dc.tags : [dc.tags]).collect { it as String }
+            return EnvTemplate.resolveList(dc.tags, steps)
         }
 
-        def image = dc.image ?: steps.env.IMAGE_NAME
+        def image = EnvTemplate.resolve(dc.image ?: steps.env.IMAGE_NAME, steps)
         if (!image) {
             steps.error('stages.build.docker.image is required when docker.tags is not set')
         }
 
-        def tag = dc.tag ?: steps.env.IMAGE_TAG ?: steps.env.BUILD_NUMBER ?: 'latest'
+        def tag = EnvTemplate.resolve(dc.tag ?: steps.env.IMAGE_TAG ?: steps.env.BUILD_NUMBER ?: 'latest', steps)
         return ["${image}:${tag}" as String]
     }
 
@@ -75,11 +77,11 @@ class DockerBuilder implements BuildTool, Serializable {
         if (dc.extraArgs) {
             args << (dc.extraArgs as String)
         }
-        (dc.buildArgs ?: [:]).each { k, v ->
+        EnvTemplate.resolveMap(dc.buildArgs ?: [:], steps).each { k, v ->
             args << '--build-arg'
             args << (v == null ? shellQuote(k as String) : shellQuote("${k}=${v}" as String))
         }
-        (dc.labels ?: [:]).each { k, v ->
+        EnvTemplate.resolveMap(dc.labels ?: [:], steps).each { k, v ->
             args << '--label'
             args << shellQuote("${k}=${v}" as String)
         }
