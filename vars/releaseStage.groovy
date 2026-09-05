@@ -9,11 +9,16 @@ def call(Map config) {
     def branchSlug = slug(branch ?: tag ?: 'detached')
     def releaseType = classify(rc, branch, tag)
     def profile = releaseType == 'formal' ? (rc.formal ?: [:]) : (rc.snapshot ?: [:])
-    def version = releaseVersion(releaseType, profile, branchSlug, shortSha)
+
+    // Export before resolving the version template: snapshot/formal version
+    // strings reference ${BRANCH_SLUG} and ${SHORT_SHA}, which must be in the
+    // environment by the time EnvTemplate runs.
     env.RELEASE_TYPE = releaseType
-    env.RELEASE_VERSION = version
     env.BRANCH_SLUG = branchSlug
     env.SHORT_SHA = shortSha
+
+    def version = releaseVersion(releaseType, profile, branchSlug, shortSha)
+    env.RELEASE_VERSION = version
 
     def imageTag = imageTag(profile, version)
 
