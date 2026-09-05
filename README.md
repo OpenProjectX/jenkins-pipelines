@@ -102,6 +102,8 @@ Set `stages.build.tool` and configure the matching block:
 build:
   tool: gradle            # gradle | maven | nodejs | docker
   # container: jdk17      # legacy k8s sidecar only; omit for the all-in-one jnlp agent
+  prePull:                # docker pull into the agent daemon before the build
+    - ghcr.io/openprojectx/dockerhub/library/eclipse-temurin:17-jdk
   gradle:
     tasks: "clean build -x test"
     jdkVersion: "17"      # k8s all-in-one: JAVA17_HOME; classic: Jenkins JDK tool "jdk-17"
@@ -137,6 +139,8 @@ build:
 ```
 
 Unit-test commands are configured separately under `stages.unit-test.<tool>` (`gradle.tasks`, `maven.goals`, `nodejs.testScript`, `docker.command`). Docker builds skip unit tests unless `unit-test.docker.command` is set.
+
+`build.prePull` runs `docker pull` on the listed images before the build — required when the build expects images to already exist in the agent's daemon (e.g. a Quarkus Jib build with a `docker://` base image, where Jib inspects but never pulls), and useful to warm the agent's docker-graph cache in general.
 
 ### Injecting credentials
 
