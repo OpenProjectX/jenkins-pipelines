@@ -77,6 +77,15 @@ class DockerBuilder implements BuildTool, Serializable {
         if (dc.extraArgs) {
             args << (dc.extraArgs as String)
         }
+        // Standard BuildKit cache-namespace contract (see README "BuildKit
+        // cache contract"): Dockerfiles declare `ARG CACHE_NAMESPACE` and use
+        // it in RUN --mount=type=cache,id=${CACHE_NAMESPACE}-... to scope
+        // per-repo artifact caches (cargo target/ etc.). Package-manager
+        // caches (registries, pip, go mod) are content-addressed and stay
+        // global without the namespace. BuildKit ignores the arg when the
+        // Dockerfile doesn't declare it. Overridable per repo.
+        def namespace = slug(dc.cacheNamespace ?: steps.env.JOB_BASE_NAME ?: 'default')
+        args << '--build-arg' << shellQuote("CACHE_NAMESPACE=${namespace}")
         EnvTemplate.resolveMap(dc.buildArgs ?: [:], steps).each { k, v ->
             args << '--build-arg'
             args << (v == null ? shellQuote(k as String) : shellQuote("${k}=${v}" as String))
@@ -121,5 +130,14 @@ class DockerBuilder implements BuildTool, Serializable {
 
     private static String shellQuote(String value) {
         "'${value.replace("'", "'\"'\"'")}'"
+    }
+
+    @NonCPS
+    private static String slug(String value) {
+        def s = (value ?: '').toLowerCase()
+            .replaceAll(/[^a-z0-9._-]+/, '-')
+            .replaceAll(/^-+|-+$/, '')
+            .take(63)
+        return s ?: 'default'
     }
 }

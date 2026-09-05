@@ -48,6 +48,8 @@ stages:
       dockerfile: Dockerfile
       buildKit: true
       push: false
+      # cacheNamespace: my-repo   # default: JOB_BASE_NAME; scopes the
+      #                           # CACHE_NAMESPACE build arg for cache mounts
 
   release:
     enabled: false

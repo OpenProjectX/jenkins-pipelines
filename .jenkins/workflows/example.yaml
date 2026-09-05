@@ -50,6 +50,33 @@ stages:
     #   nodeVersion: "20"
     #   packageManager: npm      # npm | yarn
     #   buildScript: build
+    # Language-agnostic pattern (rust / go / python / anything): build AND
+    # test inside a multi-stage Dockerfile, no native builder needed. The
+    # pipeline always passes --build-arg CACHE_NAMESPACE=<repo-slug> — use it
+    # in cache-mount ids to scope per-repo artifact caches (cargo target/);
+    # package-manager caches are content-addressed and stay global.
+    # docker:
+    #   target: runtime          # final multi-stage target
+    #   image: ghcr.io/openprojectx/my-service
+    #   tag: "${IMAGE_TAG}"      # default: IMAGE_TAG, then BUILD_NUMBER
+    #   push: true
+    #   registry:
+    #     url: ghcr.io
+    #     credentialsId: ghcr-token
+    #   # Dockerfile sketch:
+    #   #   ARG CACHE_NAMESPACE=default
+    #   #   FROM rust:1 AS builder
+    #   #   RUN --mount=type=cache,id=${CACHE_NAMESPACE}-cargo-registry,target=/usr/local/cargo/registry \
+    #   #       --mount=type=cache,id=${CACHE_NAMESPACE}-cargo-git,target=/usr/local/cargo/git \
+    #   #       --mount=type=cache,id=${CACHE_NAMESPACE}-cargo-target,target=/app/target,sharing=locked \
+    #   #       cargo build --release && cargo test      # tests run in the build
+    #   #   FROM debian:bookworm-slim AS runtime
+    #   #   COPY --from=builder /app/target/release/my-svc /usr/local/bin/
+    # unit-test:                 # or extract JUnit from a test image:
+    #   docker:
+    #     command: "docker run --rm -v $PWD/test-results:/test-results my-image:test"
+    #   reports:
+    #     junit: "test-results/*.xml"
     # Optional: inject Jenkins credentials as masked env vars for the build.
     # The credential must exist in Jenkins (global or folder scope) with a
     # matching ID. Three binding shapes:

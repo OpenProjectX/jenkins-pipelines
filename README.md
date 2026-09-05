@@ -253,6 +253,21 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     npm ci
 ```
 
+**BuildKit cache contract.** The pipeline passes `--build-arg CACHE_NAMESPACE=<repo-slug>` (from `JOB_BASE_NAME`, override with `docker.cacheNamespace`) on every docker build, and layer/build caches persist on the agent's docker-graph PVC across pod replacements. Combine the two for per-language caches:
+
+- **Package-manager caches are content-addressed — keep them global** (no namespace, `sharing=shared`): cargo `/usr/local/cargo/registry` + `/usr/local/cargo/git`, go `/go/pkg/mod` + `/root/.cache/go-build`, pip `/root/.cache/pip`, uv `/root/.cache/uv`, npm `/root/.npm`, bun `/root/.bun/install/cache`, maven `/root/.m2`, gradle `/root/.gradle`.
+- **Artifact caches are project state — scope them per repo** with the namespace and `sharing=locked`: cargo `target/` is the classic case (BuildKit keys cache mounts by `target=` path across *all* builds on the daemon, so two repos mounting the same path would corrupt/serialize each other). Per-repo but **not** per-branch: cargo fingerprints artifacts against source state, so cross-branch reuse is correct and warm.
+
+```dockerfile
+ARG CACHE_NAMESPACE=default
+RUN --mount=type=cache,id=${CACHE_NAMESPACE}-cargo-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=${CACHE_NAMESPACE}-cargo-git,target=/usr/local/cargo/git \
+    --mount=type=cache,id=${CACHE_NAMESPACE}-cargo-target,target=/app/target,sharing=locked \
+    cargo build --release && cargo test
+```
+
+Rust/Go/Python services need nothing beyond this pattern: build (and test) inside the Dockerfile with `tool: docker`, and skip a native builder entirely.
+
 On the recommended Kubernetes agent, `/var/lib/docker` is backed by the Jenkins agent Docker-cache PVC, so pulled images and BuildKit cache data survive agent pod replacement.
 
 **Test reports.** `reports.junit` on the `unit-test` / `integration-test` stages must point at JUnit **XML result files** (e.g. `**/build/test-results/**/*.xml`) — pointing it at HTML report folders breaks the parser. To keep the browsable HTML reports on the build page, set `archiveArtifacts` on the test stage (same Ant-glob semantics as the build stage; folders need a trailing `/**`):
