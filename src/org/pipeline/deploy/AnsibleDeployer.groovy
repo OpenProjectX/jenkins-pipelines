@@ -66,6 +66,20 @@ class AnsibleDeployer implements Deployer, Serializable {
         if (ac.limit) {
             call.limit = ac.limit as String
         }
+
+        if (ac.tokenCredentialsId) {
+            // Private release registries: expose the token to the playbook as
+            // artifact_token (used e.g. as a GitHub download Authorization).
+            steps.withCredentials([steps.usernamePassword(
+                credentialsId   : ac.tokenCredentialsId as String,
+                usernameVariable: 'ARTIFACT_TOKEN_USER',
+                passwordVariable: 'ARTIFACT_TOKEN'
+            )]) {
+                extraVars.artifact_token = steps.env.ARTIFACT_TOKEN
+                steps.ansiblePlaybook(call)
+            }
+            return
+        }
         steps.ansiblePlaybook(call)
     }
 }
