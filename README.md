@@ -404,6 +404,6 @@ All classes take the pipeline `steps` object in their constructor and must imple
 Controller/agent tooling assumed by the stages you enable:
 
 - **Plugins**: Pipeline Utility Steps (`readYaml`), AnsiColor, JUnit, Workspace Cleanup; SonarQube Scanner (`withSonarQubeEnv`), GitHub Notify (`githubNotify`), Bitbucket Build Status Notifier (`bitbucketStatusNotify`), Config File Provider (Maven `settingsId`), NodeJS plugin — each only if the matching feature is used.
-- **Agent tools**: `git` (plus `git-lfs` if enabled), the selected build tool (`./gradlew` wrapper, `./mvnw` or `mvn`, node/npm/yarn, docker), `trivy`, `helm`, `kubectl` as applicable. For Kubernetes pod agents, the recommended `jnlp` image is `ghcr.io/openprojectx/jenkins-build-agent:latest`.
+- **Agent tools**: `git` (plus `git-lfs` if enabled), the selected build tool (`./gradlew` wrapper, `./mvnw` or `mvn`, node/npm/yarn/bun, docker), `trivy`, `helm`, `kubectl`, `helmfile` as applicable. For Kubernetes pod agents, the recommended `jnlp` image is `ghcr.io/openprojectx/jenkins-build-agent:latest`.
 - **Tool installations**: JDKs named `jdk-<version>` and NodeJS installations named `NodeJS-<version>` when `jdkVersion`/`nodeVersion` are set.
 - **Credentials**: secret text / username-password / secret file credentials for build & unit-test env injection; kubeconfig file credentials for deploy; GitHub/Bitbucket tokens for the PR gate.
