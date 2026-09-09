@@ -47,11 +47,11 @@ def call(Map config) {
         usernameVariable: 'GH_USER',
         passwordVariable: 'GH_TOKEN'
     )]) {
-        // Branch builds have no tag yet — create and push it so the release
-        // has something to attach to.
+        // Branch builds have no tag yet — create it on the remote via the gh
+        // API (raw `git push` has no credentials here), idempotently.
         sh(label: 'Ensure release tag', script:
-            "git rev-parse -q --verify refs/tags/${tag} >/dev/null 2>&1 || " +
-            "(git tag ${tag} && git push origin ${tag})")
+            "gh api repos/${repo}/git/ref/refs/tags/${tag} >/dev/null 2>&1 || " +
+            "(git tag ${tag} && gh api repos/${repo}/git/refs -f ref=refs/tags/${tag} -f sha=\$(git rev-parse HEAD))")
 
         sh(label: 'Ensure GitHub release', script:
             "gh release view ${tag} -R ${repo} >/dev/null 2>&1 || " +
