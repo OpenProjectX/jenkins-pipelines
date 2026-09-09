@@ -64,12 +64,22 @@ def call(Map config) {
 }
 
 private String githubRepo() {
-    def url = (env.GIT_URL ?: '').replaceAll(/\.git$/, '')
+    def url = env.GIT_URL
+    if (!url) {
+        // Multibranch jobs don't always export GIT_URL — fall back to the
+        // job's SCM configuration.
+        try {
+            url = scm.getUserRemoteConfigs()[0]?.getUrl()
+        } catch (ignored) {
+            // scm not bound (non-multibranch context)
+        }
+    }
+    url = (url ?: '').replaceAll(/\.git$/, '')
     if (url.startsWith('git@github.com:')) {
         url = url.replace('git@github.com:', 'https://github.com/')
     }
     if (!url.startsWith('https://github.com/')) {
-        error("publishRelease: GIT_URL is not a GitHub repository: ${env.GIT_URL}")
+        error("publishRelease: cannot resolve a GitHub repository URL (GIT_URL=${env.GIT_URL})")
     }
     return url.substring('https://github.com/'.length())
 }
