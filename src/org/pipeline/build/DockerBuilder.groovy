@@ -29,6 +29,40 @@ class DockerBuilder implements BuildTool, Serializable {
                     steps.sh(label: "Docker Push ${tag}", script: "docker push ${shellQuote(tag)}")
                 }
             }
+
+            exportArtifacts(dc, tags)
+        }
+    }
+
+    /**
+     * Copy files out of the built image into the workspace, so they can be
+     * published as release artifacts (the image stays the source of truth —
+     * the exported bytes are exactly what was shipped to the registry).
+     *
+     *   docker:
+     *     export:
+     *       - from: /usr/local/bin/rlist
+     *         to: dist/rlist-linux-amd64
+     */
+    private void exportArtifacts(Map dc, List<String> tags) {
+        def exports = dc.export
+        if (!exports) {
+            return
+        }
+        def image = tags[0]
+        def cid = "extract-${steps.env.BUILD_NUMBER}-${UUID.randomUUID().toString().substring(0, 8)}"
+        steps.sh(label: 'Create export container', script: "docker create --name ${cid} ${shellQuote(image)}")
+        try {
+            EnvTemplate.resolveList(exports, steps).each { entry ->
+                def from = (entry as Map).from
+                def to = (entry as Map).to
+                if (!from || !to) {
+                    steps.error("docker.export entries need 'from' and 'to': ${entry}")
+                }
+                steps.sh(label: "Export ${from}", script: "docker cp ${cid}:${shellQuote(from as String)} ${shellQuote(to as String)}")
+            }
+        } finally {
+            steps.sh(script: "docker rm -f ${cid} >/dev/null 2>&1 || true")
         }
     }
 

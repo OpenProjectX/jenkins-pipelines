@@ -76,6 +76,14 @@ private void runPipeline(Map params) {
                     }
                 }
 
+                // Publish release artifacts to the registry (source of truth
+                // for deployments) — formal builds only, before any deploy.
+                if (config.stages?.release?.publish && env.RELEASE_TYPE == 'formal') {
+                    stage('Publish') {
+                        publishRelease(config)
+                    }
+                }
+
                 def sc = config.stages?.scan
                 if (sc && (sc.sonar?.enabled != false || sc.trivy?.enabled == true)) {
                     stage('Scan') {

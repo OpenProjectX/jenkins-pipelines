@@ -5,9 +5,11 @@ class DeployerFactory implements Serializable {
         switch (tool?.toLowerCase()) {
             case 'helm':      return new HelmDeployer(steps)
             case 'kustomize': return new KustomizeDeployer(steps)
+            case 'ansible':
+            case 'vm':        return new AnsibleDeployer(steps)
             default:
                 throw new IllegalArgumentException(
-                    "Unsupported deploy tool: '${tool}'. Supported: helm, kustomize"
+                    "Unsupported deploy tool: '${tool}'. Supported: helm, kustomize, ansible"
                 )
         }
     }

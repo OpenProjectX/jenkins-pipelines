@@ -64,7 +64,7 @@ Stages run in this order. Each is driven by its section under `stages:` in the w
 | Build | yes | Builds with the configured tool (`gradle` \| `maven` \| `nodejs` \| `docker`), optionally archives artifacts |
 | Unit Test | yes | Runs tests with the same tool, always publishes JUnit results |
 | Scan | no | SonarQube analysis (with quality-gate wait) and/or Trivy image scan; runs both in parallel when both are enabled |
-| Deploy | no | Deploys to every environment whose `branches` patterns match the current branch, via `helm` or `kustomize` |
+| Deploy | no | Deploys to every environment whose `branches` patterns match the current branch, via `helm`, `kustomize`, or `ansible` (VMs) |
 | Integration Test | no | Runs an arbitrary shell command with a timeout, publishes JUnit results |
 | PR Gate | yes (PR builds only) | Reports build status back to GitHub or Bitbucket; final status is always sent, even on failure |
 
@@ -190,6 +190,26 @@ It exports:
 | `SHORT_SHA` | `abc123def456` | 12-character Git SHA |
 
 Formal tag builds normalize a leading `v`, so `v1.2.3` becomes `RELEASE_VERSION=1.2.3`. If a formal branch build has no `TAG_NAME`, the fallback version is `${BUILD_NUMBER}.${SHORT_SHA}`; for production releases, prefer tag-triggered builds or override `formal.version` from your own version file/tool.
+
+**Publishing artifacts.** `stages.release.publish` uploads artifacts to the release registry — the source of truth for VM deployments — on **formal builds only** (a Publish stage runs after Unit Test). GitHub Releases is the built-in provider; branch builds auto-create a `v<RELEASE_VERSION>` tag and publish as a prerelease, tag builds publish a full release. Requires the `gh` CLI (the recommended agent image has it):
+
+```yaml
+release:
+  publish:
+    provider: github
+    credentialsId: github          # username/password credential (PAT)
+    artifacts: ["dist/rlist-linux-amd64"]
+```
+
+**Docker image export.** `build.docker.export` copies files out of the built image into the workspace — the exported bytes are exactly what was pushed to the registry, so artifacts can't drift from the tested image:
+
+```yaml
+build:
+  docker:
+    export:
+      - from: /usr/local/bin/rlist
+        to: dist/rlist-linux-amd64
+```
 
 Docker and deploy configs can consume these values directly:
 
@@ -343,6 +363,23 @@ deploy:
 ```
 
 Helm deploys use `helm upgrade --install --create-namespace`; Kustomize uses `kubectl apply -k` followed by `kubectl rollout status`. Both deployers also implement `rollback()`.
+
+**VM deployments (ansible).** For non-Kubernetes targets, `tool: ansible` runs the repo's playbook via the Jenkins ansible plugin (the `ansible` CLI lives on the recommended agent image). The playbook owns the on-VM contract — download the artifact from the release registry by URL, install, switch, restart, health-gate — and receives `artifact_url` / `artifact_version` (auto-set from the release stage) as extra vars; `rollback()` re-runs the playbook with `rollback=true`:
+
+```yaml
+deploy:
+  environments:
+    - name: vm
+      branches: ["master", "v*"]
+      tool: ansible
+      ansible:
+        playbook: deploy/ansible/deploy.yml    # lives in the app repo
+        inventory: deploy/ansible/inventory/prod.ini
+        credentialsId: vm-ssh-key              # Jenkins SSH private key credential
+        limit: rlist                           # optional host/group subset
+        extraVars:
+          artifact_url: "https://github.com/org/repo/releases/download/v${RELEASE_VERSION}/app"
+```
 
 ### PR gate
 
