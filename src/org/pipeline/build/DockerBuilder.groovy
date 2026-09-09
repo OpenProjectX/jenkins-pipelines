@@ -53,9 +53,12 @@ class DockerBuilder implements BuildTool, Serializable {
         def cid = "extract-${steps.env.BUILD_NUMBER}-${UUID.randomUUID().toString().substring(0, 8)}"
         steps.sh(label: 'Create export container', script: "docker create --name ${cid} ${shellQuote(image)}")
         try {
-            EnvTemplate.resolveList(exports, steps).each { entry ->
-                def from = (entry as Map).from
-                def to = (entry as Map).to
+            // Note: entries are maps — resolve the scalar fields individually
+            // (resolveList would stringify the whole entry).
+            (exports as List).each { rawEntry ->
+                def entry = rawEntry as Map
+                def from = EnvTemplate.resolve(entry.from, steps)
+                def to = EnvTemplate.resolve(entry.to, steps)
                 if (!from || !to) {
                     steps.error("docker.export entries need 'from' and 'to': ${entry}")
                 }
