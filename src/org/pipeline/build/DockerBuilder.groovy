@@ -62,6 +62,7 @@ class DockerBuilder implements BuildTool, Serializable {
                 if (!from || !to) {
                     steps.error("docker.export entries need 'from' and 'to': ${entry}")
                 }
+                steps.sh(label: "Prepare ${to}", script: "mkdir -p \"\$(dirname ${shellQuote(to as String)})\"")
                 steps.sh(label: "Export ${from}", script: "docker cp ${cid}:${shellQuote(from as String)} ${shellQuote(to as String)}")
             }
         } finally {
