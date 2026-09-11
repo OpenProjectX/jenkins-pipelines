@@ -64,7 +64,7 @@ Stages run in this order. Each is driven by its section under `stages:` in the w
 | Build | yes | Builds with the configured tool (`gradle` \| `maven` \| `nodejs` \| `docker`), optionally archives artifacts |
 | Unit Test | yes | Runs tests with the same tool, always publishes JUnit results |
 | Scan | no | SonarQube analysis (with quality-gate wait) and/or Trivy image scan; runs both in parallel when both are enabled |
-| Deploy | no | Deploys to every environment whose `branches` patterns match the current branch, via `helm`, `kustomize`, or `ansible` (VMs) |
+| Deploy | no | Deploys to every environment whose `branches` patterns match the current branch, via `helm`, `helmfile`, `kustomize`, or `ansible` (VMs) |
 | Integration Test | no | Runs an arbitrary shell command with a timeout, publishes JUnit results |
 | PR Gate | yes (PR builds only) | Reports build status back to GitHub or Bitbucket; final status is always sent, even on failure |
 
@@ -363,6 +363,23 @@ deploy:
 ```
 
 Helm deploys use `helm upgrade --install --create-namespace`; Kustomize uses `kubectl apply -k` followed by `kubectl rollout status`. Both deployers also implement `rollback()`.
+
+**Helmfile (multi-release deploys).** For deploys that fan out to several releases, `tool: helmfile` runs one state file (the helmfile CLI ships on the recommended agent image; helm-diff is auto-installed on first apply). Values are injected with `--state-values-set` and read in the state file as `{{ .Values.image_tag }}`; versioning lives in git, so rollback = revert + redeploy:
+
+```yaml
+deploy:
+  environments:
+    - name: k8s
+      branches: ["master", "v*"]
+      tool: helmfile
+      helmfile:
+        file: deploy/helmfile.yaml
+        command: apply              # apply|sync|diff|template|destroy
+        stateValuesSet:
+          image_tag: "${IMAGE_TAG}"
+```
+
+The legacy per-release `tool: helm` / `kustomize` entries keep working — prefer helmfile when one deploy unit spans multiple releases.
 
 **VM deployments (ansible).** For non-Kubernetes targets, `tool: ansible` runs the repo's playbook via the Jenkins ansible plugin (the `ansible` CLI lives on the recommended agent image). The playbook owns the on-VM contract — download the artifact from the release registry by URL, install, switch, restart, health-gate — and receives `artifact_url` / `artifact_version` (auto-set from the release stage) as extra vars; `rollback()` re-runs the playbook with `rollback=true`:
 
