@@ -37,7 +37,7 @@ class HelmfileDeployer implements Deployer, Serializable {
 
     @Override
     void deploy(Map environment, Map config) {
-        run(environment, 'apply')
+        run(environment, config, 'apply')
     }
 
     @Override
@@ -45,7 +45,7 @@ class HelmfileDeployer implements Deployer, Serializable {
         steps.echo('[Deploy] helmfile rollback is not supported — revert the state file and redeploy')
     }
 
-    private void run(Map environment, String defaultCommand) {
+    private void run(Map environment, Map config, String defaultCommand) {
         def hc = environment.helmfile ?: [:]
         def file = hc.file ?: 'helmfile.yaml'
 
