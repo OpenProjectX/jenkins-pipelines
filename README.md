@@ -403,8 +403,30 @@ deploy:
 `secretVars` maps an extra-var name to a **secret text** credential, for the
 credentials a playbook needs of its own — a DNS API token, a certificate, a
 registry password — so they live in Jenkins rather than in the repo or on the
-command line. Jenkins masks the values in the log; the playbook should still mark
-the tasks that consume them `no_log: true`.
+command line.
+
+A credential's *kind* decides how it can be bound, so anything that is not secret
+text goes through `credentialVars`:
+
+```yaml
+        credentialVars:
+          - id: cloudflare-api-key         # Username with password
+            kind: usernamePassword
+            usernameVar: cf_api_email
+            passwordVar: cf_api_key
+          - id: cloudflare                 # Certificate (PKCS#12 keystore)
+            kind: certificate
+            keystoreVar: cf_keystore_path
+            passwordVar: cf_keystore_password
+          - id: some-token                 # Secret text, long form
+            kind: secretText
+            var: cf_api_token
+```
+
+A certificate credential yields the path to a PKCS#12 keystore Jenkins wrote out,
+plus its password; converting that to whatever the service wants (PEM, usually) is
+the playbook's job. Jenkins masks the values in the log; the playbook should still
+mark the tasks that consume them `no_log: true`.
 
 ### PR gate
 

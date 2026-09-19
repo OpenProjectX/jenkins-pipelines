@@ -23,14 +23,27 @@ import org.pipeline.utils.EnvTemplate
  *             artifact_url: "https://github.com/org/repo/releases/download/v${RELEASE_VERSION}/app"
  *           secretVars:                    # Jenkins secret text -> extra var
  *             cf_api_token: cloudflare-api-token
- *             btdig_tls_cert_content: cloudflare-origin-cert
+ *           credentialVars:                # any credential kind -> extra vars
+ *             - id: cloudflare-api-key
+ *               kind: usernamePassword
+ *               usernameVar: cf_api_email
+ *               passwordVar: cf_api_key
+ *             - id: cloudflare
+ *               kind: certificate
+ *               keystoreVar: cf_keystore_path
+ *               passwordVar: cf_keystore_password
  *
- * `secretVars` maps an extra-var name to a Jenkins **secret text** credential.
  * Playbooks that need a credential of their own - a DNS API token, a certificate,
  * a registry password - get it this way instead of having it committed or passed
- * on the command line. The values are bound with withCredentials, so Jenkins
- * masks them in the log, and the playbook should still use `no_log: true` on the
- * tasks that consume them.
+ * on the command line.
+ *
+ * `secretVars` is the shorthand for the common case: extra var <- secret text.
+ * `credentialVars` handles the rest, because a credential's KIND decides how it
+ * can be bound: a username/password yields two vars, and a certificate yields a
+ * PKCS#12 keystore path plus its password (the playbook extracts the PEMs).
+ *
+ * Values are bound with withCredentials, so Jenkins masks them in the log; the
+ * playbook should still mark the consuming tasks `no_log: true`.
  */
 class AnsibleDeployer implements Deployer, Serializable {
     private final def steps
@@ -79,18 +92,63 @@ class AnsibleDeployer implements Deployer, Serializable {
 
         // Playbook-owned credentials: each becomes an extra var, and Jenkins
         // masks the values in the build log.
-        def secretVars = (ac.secretVars ?: [:]) as Map
-        if (secretVars) {
-            def bindings = []
-            def names = []
-            secretVars.each { varName, credentialsId ->
-                def envName = "SECRET_${names.size()}"
-                names << [varName: varName as String, envName: envName]
-                bindings << steps.string(credentialsId: credentialsId as String, variable: envName)
+        def bindings = []
+        def names = []
+
+        (ac.secretVars ?: [:]).each { varName, credentialsId ->
+            def envName = "SECRET_${names.size()}"
+            names << [varName: varName as String, envName: envName]
+            bindings << steps.string(credentialsId: credentialsId as String, variable: envName)
+        }
+
+        (ac.credentialVars ?: []).each { entry ->
+            def id = entry.id as String
+            if (!id) {
+                steps.error('deploy: credentialVars[].id is required')
             }
+            switch (entry.kind ?: 'secretText') {
+                case 'secretText':
+                    def envName = "SECRET_${names.size()}"
+                    names << [varName: (entry.var ?: entry.variable) as String, envName: envName]
+                    bindings << steps.string(credentialsId: id, variable: envName)
+                    break
+                case 'usernamePassword':
+                    def userEnv = "CRED_${names.size()}_USER"
+                    def passEnv = "CRED_${names.size()}_PASS"
+                    names << [varName: entry.usernameVar as String, envName: userEnv]
+                    names << [varName: entry.passwordVar as String, envName: passEnv]
+                    bindings << steps.usernamePassword(
+                        credentialsId  : id,
+                        usernameVariable: userEnv,
+                        passwordVariable: passEnv,
+                    )
+                    break
+                case 'certificate':
+                    // A certificate credential is a PKCS#12 keystore: Jenkins
+                    // writes it to a temp file and gives us the path plus the
+                    // keystore password. Turning it into PEM is the playbook's
+                    // job, since only it knows what the service wants.
+                    def storeEnv = "CRED_${names.size()}_STORE"
+                    def passEnv = "CRED_${names.size()}_STOREPASS"
+                    names << [varName: entry.keystoreVar as String, envName: storeEnv]
+                    names << [varName: entry.passwordVar as String, envName: passEnv]
+                    bindings << steps.certificate(
+                        credentialsId   : id,
+                        keystoreVariable: storeEnv,
+                        passwordVariable: passEnv,
+                    )
+                    break
+                default:
+                    steps.error("deploy: unsupported credentialVars kind '${entry.kind}' for ${id}")
+            }
+        }
+
+        if (bindings) {
             steps.withCredentials(bindings) {
                 names.each { entry ->
-                    extraVars[entry.varName] = steps.env[entry.envName]
+                    if (entry.varName) {
+                        extraVars[entry.varName] = steps.env[entry.envName]
+                    }
                 }
                 runWithToken(ac, call, extraVars)
             }
