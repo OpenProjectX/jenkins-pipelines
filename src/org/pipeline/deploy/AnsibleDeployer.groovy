@@ -21,6 +21,16 @@ import org.pipeline.utils.EnvTemplate
  *           limit: rlist                   # optional host/group subset
  *           extraVars:                     # ${VAR}-expanded
  *             artifact_url: "https://github.com/org/repo/releases/download/v${RELEASE_VERSION}/app"
+ *           secretVars:                    # Jenkins secret text -> extra var
+ *             cf_api_token: cloudflare-api-token
+ *             btdig_tls_cert_content: cloudflare-origin-cert
+ *
+ * `secretVars` maps an extra-var name to a Jenkins **secret text** credential.
+ * Playbooks that need a credential of their own - a DNS API token, a certificate,
+ * a registry password - get it this way instead of having it committed or passed
+ * on the command line. The values are bound with withCredentials, so Jenkins
+ * masks them in the log, and the playbook should still use `no_log: true` on the
+ * tasks that consume them.
  */
 class AnsibleDeployer implements Deployer, Serializable {
     private final def steps
@@ -67,6 +77,29 @@ class AnsibleDeployer implements Deployer, Serializable {
             call.limit = ac.limit as String
         }
 
+        // Playbook-owned credentials: each becomes an extra var, and Jenkins
+        // masks the values in the build log.
+        def secretVars = (ac.secretVars ?: [:]) as Map
+        if (secretVars) {
+            def bindings = []
+            def names = []
+            secretVars.each { varName, credentialsId ->
+                def envName = "SECRET_${names.size()}"
+                names << [varName: varName as String, envName: envName]
+                bindings << steps.string(credentialsId: credentialsId as String, variable: envName)
+            }
+            steps.withCredentials(bindings) {
+                names.each { entry ->
+                    extraVars[entry.varName] = steps.env[entry.envName]
+                }
+                runWithToken(ac, call, extraVars)
+            }
+            return
+        }
+        runWithToken(ac, call, extraVars)
+    }
+
+    private void runWithToken(Map ac, Map call, Map extraVars) {
         if (ac.tokenCredentialsId) {
             // Private release registries: expose the token to the playbook as
             // artifact_token (used e.g. as a GitHub download Authorization).

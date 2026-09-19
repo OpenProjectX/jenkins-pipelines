@@ -396,7 +396,15 @@ deploy:
         limit: rlist                           # optional host/group subset
         extraVars:
           artifact_url: "https://github.com/org/repo/releases/download/v${RELEASE_VERSION}/app"
+        secretVars:                            # Jenkins secret text -> extra var
+          cf_api_token: cloudflare-api-token
 ```
+
+`secretVars` maps an extra-var name to a **secret text** credential, for the
+credentials a playbook needs of its own — a DNS API token, a certificate, a
+registry password — so they live in Jenkins rather than in the repo or on the
+command line. Jenkins masks the values in the log; the playbook should still mark
+the tasks that consume them `no_log: true`.
 
 ### PR gate
 
