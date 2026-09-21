@@ -8,9 +8,10 @@ class DeployerFactory implements Serializable {
             case 'kustomize': return new KustomizeDeployer(steps)
             case 'ansible':
             case 'vm':        return new AnsibleDeployer(steps)
+            case 'terraform': return new TerraformDeployer(steps)
             default:
                 throw new IllegalArgumentException(
-                    "Unsupported deploy tool: '${tool}'. Supported: helm, helmfile, kustomize, ansible"
+                    "Unsupported deploy tool: '${tool}'. Supported: helm, helmfile, kustomize, ansible, terraform"
                 )
         }
     }

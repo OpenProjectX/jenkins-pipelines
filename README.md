@@ -64,7 +64,7 @@ Stages run in this order. Each is driven by its section under `stages:` in the w
 | Build | yes | Builds with the configured tool (`gradle` \| `maven` \| `nodejs` \| `docker`), optionally archives artifacts |
 | Unit Test | yes | Runs tests with the same tool, always publishes JUnit results |
 | Scan | no | SonarQube analysis (with quality-gate wait) and/or Trivy image scan; runs both in parallel when both are enabled |
-| Deploy | no | Deploys to every environment whose `branches` patterns match the current branch, via `helm`, `helmfile`, `kustomize`, or `ansible` (VMs) |
+| Deploy | no | Deploys to every environment whose `branches` patterns match the current branch, via `helm`, `helmfile`, `kustomize`, `ansible` (VMs), or `terraform` |
 | Integration Test | no | Runs an arbitrary shell command with a timeout, publishes JUnit results |
 | PR Gate | yes (PR builds only) | Reports build status back to GitHub or Bitbucket; final status is always sent, even on failure |
 
@@ -380,6 +380,23 @@ deploy:
 ```
 
 The legacy per-release `tool: helm` / `kustomize` entries keep working — prefer helmfile when one deploy unit spans multiple releases.
+
+**Terraform.** `tool: terraform` runs `init` + the command against a working directory whose state lives in its configured backend (S3, Terraform Cloud, ...). `apply`/`destroy` always run with `-auto-approve` (CI is non-interactive); `destroy` additionally requires `autoApprove: true`. Rollback is git-based (revert + redeploy):
+
+```yaml
+deploy:
+  environments:
+    - name: infra
+      branches: ["master", "v*"]
+      tool: terraform
+      terraform:
+        dir: deploy/terraform
+        command: apply             # apply|plan|destroy|validate
+        vars:                      # -var, ${VAR}-expanded
+          image_tag: "${IMAGE_TAG}"
+        varFiles: ["prod.tfvars"]
+        initArgs: "-backend-config=..."  # optional
+```
 
 **VM deployments (ansible).** For non-Kubernetes targets, `tool: ansible` runs the repo's playbook via the Jenkins ansible plugin (the `ansible` CLI lives on the recommended agent image). The playbook owns the on-VM contract — download the artifact from the release registry by URL, install, switch, restart, health-gate — and receives `artifact_url` / `artifact_version` (auto-set from the release stage) as extra vars; `rollback()` re-runs the playbook with `rollback=true`:
 
